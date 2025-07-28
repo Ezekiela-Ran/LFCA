@@ -1,0 +1,1 @@
+from .autre import Other
