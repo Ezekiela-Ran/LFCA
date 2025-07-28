@@ -39,12 +39,12 @@ class ModalAjouterProduit(Toplevel):
         if not result:
             
             mysql_connexion_config.cursor.execute(
-                "INSERT INTO produits (categorie_id, nom_produit) VALUES ((SELECT id FROM categories WHERE nom_categorie = %s), %s)",
+                "INSERT INTO produits (categorie_id, nom_produit) VALUES ((SELECT id_categorie FROM categories WHERE nom_categorie = %s), %s)",
                 (self.categorie, nouveau_produit)
             )
             
             mysql_connexion_config.cursor.execute(
-                 "INSERT INTO produit_details (produit_id, num_acte, physico, micro, toxico, sous_total) VALUES ((SELECT id FROM produits WHERE nom_produit = %s), '', 0, 0, 0, 0)", (nouveau_produit,)
+                 "INSERT INTO produit_details (produit_id, num_acte, physico, micro, toxico, sous_total) VALUES ((SELECT id_produit FROM produits WHERE nom_produit = %s), '', 0, 0, 0, 0)", (nouveau_produit,)
             )
             mysql_connexion_config.connexion.commit()
             
@@ -52,8 +52,4 @@ class ModalAjouterProduit(Toplevel):
             self.destroy()
             
         else:
-            print("Le produit existe déjà.")
-            self.nom_du_produit.delete(0, 'end')
-            self.nom_du_produit.insert(0, "Produit déjà existant")
-            self.nom_du_produit.config(fg='red')
-            self.after(2000, lambda: self.nom_du_produit.config(fg='black'))
+            Label(self, text=f"Le produit {nouveau_produit} existe déjà", fg="red").grid(row=2, column=0, padx=10, pady=10)

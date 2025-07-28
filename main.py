@@ -54,7 +54,7 @@ ctkbutton = 10
 
 
 # Récupérer le dernier id inséré dans info_client
-mysql_connexion_config.cursor.execute("SELECT MAX(id) FROM info_client")
+mysql_connexion_config.cursor.execute("SELECT MAX(id_client) FROM info_client")
 result = mysql_connexion_config.cursor.fetchone()
 id = result[0] + 1 if result and result[0] is not None else 1
 
@@ -224,9 +224,9 @@ def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage
     cursor.execute("""
     SELECT p.nom_produit, d.num_acte, d.physico, d.micro, d.toxico, d.sous_total
     FROM produits p
-    JOIN produit_details d ON p.id = d.produit_id
+    JOIN produit_details d ON p.id_produit = d.id_produit_detail
     WHERE p.categorie_id = (
-        SELECT id FROM categories WHERE nom_categorie = %s
+        SELECT id_categorie FROM categories WHERE nom_categorie = %s
     )
 """, (categorie_selectionne,))
 
@@ -280,11 +280,11 @@ def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage
                     Physico.configure(state="disabled")
                     cursor.execute("""
                         UPDATE produit_details d
-                        JOIN produits p ON d.produit_id = p.id
+                        JOIN produits p ON d.id_produit_detail = p.id_produit
                         SET d.physico = %s
                         WHERE p.nom_produit = %s
                         AND p.categorie_id = (
-                        SELECT id FROM categories WHERE nom_categorie = %s
+                        SELECT id_categorie FROM categories WHERE nom_categorie = %s
                     )""",
                     (Physico_var.get(), nom_produit, categorie_selectionne))
 
@@ -296,11 +296,11 @@ def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage
                     Micro.configure(state="disabled")
                     cursor.execute("""
                         UPDATE produit_details d
-                        JOIN produits p ON d.produit_id = p.id
+                        JOIN produits p ON d.id_produit_detail = p.id_produit
                         SET d.micro = %s
                         WHERE p.nom_produit = %s
                         AND p.categorie_id = (
-                        SELECT id FROM categories WHERE nom_categorie = %s
+                        SELECT id_categorie FROM categories WHERE nom_categorie = %s
                     )""",
                     (Micro_var.get(), nom_produit, categorie_selectionne))
                     mysql_connexion_config.connexion.commit()
@@ -310,11 +310,11 @@ def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage
                     try:
                         cursor.execute("""
                             UPDATE produit_details d
-                            JOIN produits p ON d.produit_id = p.id
+                            JOIN produits p ON d.id_produit_detail = p.id_produit
                             SET d.toxico = %s
                             WHERE p.nom_produit = %s
                             AND p.categorie_id = (
-                            SELECT id FROM categories WHERE nom_categorie = %s
+                            SELECT id_categorie FROM categories WHERE nom_categorie = %s
                         )""",
                         (Toxico_var.get(), nom_produit, categorie_selectionne))
                         
@@ -329,7 +329,7 @@ def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage
                             SET d.sous_total = %s
                             WHERE p.nom_produit = %s
                             AND p.categorie_id = (
-                            SELECT id FROM categories WHERE nom_categorie = %s
+                            SELECT id_categorie FROM categories WHERE nom_categorie = %s
                         )""",
                         (sous_total_val, nom_produit, categorie_selectionne))
                         mysql_connexion_config.connexion.commit()
@@ -351,7 +351,7 @@ def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage
 
             def supprimer_produit():
                 cursor.execute(
-                    "DELETE FROM produits WHERE nom_produit = %s AND categorie_id = (SELECT id FROM categories WHERE nom_categorie = %s)",
+                    "DELETE FROM produits WHERE nom_produit = %s AND categorie_id = (SELECT id_categorie FROM categories WHERE nom_categorie = %s)",
                     (nom_produit, categorie_selectionne)
                 )
                 mysql_connexion_config.connexion.commit()
