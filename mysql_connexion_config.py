@@ -64,3 +64,9 @@ cursor.execute("""
     FOREIGN KEY (client_id) REFERENCES info_client(id_client) ON DELETE CASCADE,
     FOREIGN KEY (produit_id) REFERENCES produits(id_produit) ON DELETE CASCADE
 )""")
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS total (
+    id_total INT AUTO_INCREMENT PRIMARY KEY,
+    total INT NOT NULL
+)""")
