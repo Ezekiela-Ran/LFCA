@@ -50,5 +50,5 @@ class ModalAjouterCategorie(Toplevel):
             self.destroy()
             
         else:
-            Label(self, text=f"{nouvelle_categorie} existe déjà").grid(row=2, columnspan=2, padx=10, pady=10)
+            Label(self, text=f"La catégorie {nouvelle_categorie} existe déjà", fg="red").grid(row=2, columnspan=2, padx=10, pady=10)
             
