@@ -227,17 +227,29 @@ def enregister():
                             
                         physico, micro, toxico, sous_total = details
                         
+                        data.total[produit] = sous_total
+                        
                         # insérer les données dans produit_analyse
                         cursor.execute("""INSERT INTO produit_analyse (client_id, produit_id, ref_bull_analyse, num_acte, physico, micro, toxico, sous_total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", (id_client,id_produit, data.valeur_ref_bull_analyse[produit], data.valeur_num_acte[produit], physico, micro, toxico, sous_total))
+                        
+                        mysql_connexion_config.connexion.commit()
                         cursor.close()
         
-                    # Valider et fermer
-                    mysql_connexion_config.connexion.commit()
+                    total = 0
+                    for sous_total in data.total.values():
+                        try:
+                            total += float(sous_total)
+                        except (ValueError, TypeError):
+                            print(f"Erreur: sous_total non numérique ({sous_total}) ignoré.")
+                    
+                    cursor_for_total = mysql_connexion_config.connexion.cursor()
+                    
+                    cursor_for_total.execute("INSERT INTO total(total) VALUES (%s)", (total,))
                     
                     data.etat_validation_produits.clear()
                     data.valeur_ref_bull_analyse.clear()
                     data.valeur_num_acte.clear()
-                    CTkMessagebox(message="Enregistrement effectué avec succès",
+                    CTkMessagebox(message=f"Enregistrement effectué avec succès!\n Total: {total}",
                   icon="check", option_1="Fermer")
                 else:
                     CTkMessagebox(title="Error", message="Veuillez validez au moin un produit!", icon="cancel")
@@ -473,9 +485,9 @@ def enregister():
                             
                             data.etat_validation_produits[prod] = etat["click"]
                             
-                            del data.valeur_ref_bull_analyse[prod]
+                            data.valeur_ref_bull_analyse[prod] = Ref_bull_var.set(0)
                             
-                            del data.valeur_num_acte[prod]
+                            data.valeur_num_acte[prod] = Num_acte_var.set("")
                             
                             etat["click"] = True
 
