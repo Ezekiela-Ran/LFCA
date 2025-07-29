@@ -5,3 +5,5 @@ valeur_ref_bull_analyse = {}
 valeur_num_acte = {}
 
 total = {} # clé: produit , valeur: sous-total
+
+net_a_paye = ""

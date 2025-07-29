@@ -9,12 +9,8 @@ from modalAjouterProduit import ModalAjouterProduit
 import data
 import mysql_connexion_config
 from CTkMenuBar import *
-from tkinter import messagebox
-import os
 import sys
 import subprocess
-import time
-
 root = CTk()
 
 # Paramètrage de la dimension de la fenêtre
@@ -46,7 +42,7 @@ def relance_fantôme():
     fantôme = CTkToplevel()
     fantôme.geometry("400x200+500+300")
     fantôme.overrideredirect(True)  # Supprime la barre de titre
-    fantôme.configure(fg_color="skyblue")
+    fantôme.configure(fg_color=['gray86', 'gray17'])
     
     # Texte ou animation de transition
     label = CTkLabel(fantôme, text="Patientez...", font=("Arial", 20))
@@ -172,6 +168,7 @@ def enregister():
         frame2.pack(padx=paddings, pady=paddings, anchor="w", expand=True, fill="both")
         
         def pied_de_page():
+            # mysql_connexion_config.cursor.execute("SELECT total FROM total WHERE client_id = ")
             montant_a_payer = CTkLabel(master=frame2, text="Montant à payer: ")
             montant_a_payer.pack(side="bottom", anchor="center")
 
@@ -244,13 +241,37 @@ def enregister():
                     
                     cursor_for_total = mysql_connexion_config.connexion.cursor()
                     
-                    cursor_for_total.execute("INSERT INTO total(total) VALUES (%s)", (total,))
+                    # récupérer l'ID du client
+                    cursor_for_total.execute("SELECT id_client FROM info_client WHERE raison_sociale = %s", (raison_social_input.get(),))
+                    resultat_client = cursor_for_total.fetchone()
+                    # Assure que tous les resultats sont lues avant la prochaine requête
+                    while cursor_for_total.nextset():
+                        pass
+                        
+                    if resultat_client:
+                        id_client = resultat_client[0]
+                    else:
+                        print("Client introuvable")
+                        cursor_for_total.close()
+                        return
+                    
+                    cursor_for_total.execute("INSERT INTO total(client_id, total) VALUES (%s, %s)", (id_client, total))
+                    mysql_connexion_config.connexion.commit()
+                    
+                    
                     
                     data.etat_validation_produits.clear()
                     data.valeur_ref_bull_analyse.clear()
                     data.valeur_num_acte.clear()
+                    data.total.clear()
                     CTkMessagebox(message=f"Enregistrement effectué avec succès!\n Total: {total}",
                   icon="check", option_1="Fermer")
+                    
+                    for widget in frame2.winfo_children():
+                        widget.destroy()
+                    
+                    bouton_suivant.configure(state="disabled")
+                    
                 else:
                     CTkMessagebox(title="Error", message="Veuillez validez au moin un produit!", icon="cancel")
             
@@ -554,8 +575,8 @@ def enregister():
         frame2_2_C.pack(fill="both", expand=True, padx=paddings, pady=paddings)
                     
 
-bouton_enregistrer = CTkButton(master=frame1, command=enregister,text="Suivant", width=ctkbutton)
-bouton_enregistrer.grid(column=3, row=4, padx=paddings, pady=paddings)
+bouton_suivant = CTkButton(master=frame1, command=enregister,text="Suivant", width=ctkbutton)
+bouton_suivant.grid(column=3, row=4, padx=paddings, pady=paddings)
 
 # CORP (body)
 if not terminer :
