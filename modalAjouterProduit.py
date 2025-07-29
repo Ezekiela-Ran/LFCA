@@ -44,7 +44,7 @@ class ModalAjouterProduit(Toplevel):
             )
             
             mysql_connexion_config.cursor.execute(
-                 "INSERT INTO produit_details (produit_id, num_acte, physico, micro, toxico, sous_total) VALUES ((SELECT id_produit FROM produits WHERE nom_produit = %s), '', 0, 0, 0, 0)", (nouveau_produit,)
+                 "INSERT INTO produit_details (produit_id, physico, micro, toxico, sous_total) VALUES ((SELECT id_produit FROM produits WHERE nom_produit = %s),0, 0, 0, 0)", (nouveau_produit,)
             )
             mysql_connexion_config.connexion.commit()
             
