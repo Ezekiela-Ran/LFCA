@@ -1,0 +1,1 @@
+SELECT ik.raison_sociale, p.nom_produit, pa.physico, pa.micro, pa.toxico, t.total FROM info_client ik JOIN produits p ON ik.raison_sociale = "JB" AND ik.date_emission = "2025-08-01" JOIN produit_analyse pa ON pa.client_id = ik.id_client JOIN total t ON t.client_id = ik.id_client AND t.date_emission ="2025-08-01";
