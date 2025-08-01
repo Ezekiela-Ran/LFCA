@@ -3,14 +3,18 @@ from customtkinter import CTk, CTkFrame, CTkEntry, CTkButton, CTkScrollableFrame
 from customtkinter import StringVar, IntVar, CTkToplevel
 import customtkinter
 from CTkMessagebox import CTkMessagebox
+import mysql
 from tkcalendar import DateEntry
 from modalAjouterCategorie import ModalAjouterCategorie
 from modalAjouterProduit import ModalAjouterProduit
+from modalModifierNumFacture import ModalModifierNumFacture
 import data
 import mysql_connexion_config
 from CTkMenuBar import *
 import sys
 import subprocess
+import time
+
 root = CTk()
 
 # Paramètrage de la dimension de la fenêtre
@@ -64,8 +68,47 @@ dropdown1 = CustomDropdownMenu(widget=menu_theme)
 dropdown1.add_option(option="sombre", command=lambda: customtkinter.set_appearance_mode("dark")) 
 dropdown1.add_option(option="lumineux", command=lambda: customtkinter.set_appearance_mode("light")) 
 
+
+def reinitialiser():
+    try:
+        # Générer un suffixe unique (par exemple : timestamp)
+        suffixe = time.strftime("%Y")
+
+        # Liste des tables à sauvegarder
+        tables = [
+            "categories",
+            "produits",
+            "produit_details",
+            "info_client",
+            "produit_analyse",
+            "total"
+        ]
+
+        for table in tables:
+            nom_sauvegarde = f"{table}{suffixe}"
+            requete = f"CREATE TABLE {nom_sauvegarde} AS SELECT * FROM {table}"
+            mysql_connexion_config.cursor.execute(requete)
+
+        # Suppression des anciennes tables
+        for table in reversed(tables):
+            mysql_connexion_config.cursor.execute(f"DROP TABLE IF EXISTS {table}")
+
+        mysql_connexion_config.connexion.commit()
+        
+        CTkMessagebox(message="Réinitialisation terminée avec sauvegarde!", icon="check", option_1="Fermer")
+    
+    except mysql.connector.Error as err:
+        mysql_connexion_config.connexion.rollback()
+        print("Erreur:", err)
+
+    
 dropdown2 = CustomDropdownMenu(widget=menu_other)
-dropdown2.add_option(option="Réinitialiser") 
+dropdown2.add_option(option="Réinitialiser", command=reinitialiser) 
+
+def modifier_num_facture():
+    ModalModifierNumFacture(parent=root,zone_modif_num=num_fact)
+#facture_label
+dropdown2.add_option(option="Modifier le numéro de la facture", command=modifier_num_facture) 
 
 mysql_connexion_config.cursor.execute("SELECT * FROM categories")
 for row in mysql_connexion_config.cursor.fetchall():
@@ -80,6 +123,7 @@ leBoutonValiderEstCliquer = "non"
 mysql_connexion_config.cursor.execute("SELECT MAX(id_client) FROM info_client")
 result = mysql_connexion_config.cursor.fetchone()
 id = result[0] + 1 if result and result[0] is not None else 1
+data.id = id
 
 label_width = 75
 my_font = CTkFont(family="Comfortaa", size=12, weight="bold", slant="italic")
@@ -121,8 +165,10 @@ adresse_input = CTkEntry(master=frame1, textvariable=StringVar())
 adresse_input.grid(column=1, row=3, padx=paddings, pady=paddings)
 
 # N°Facture
-facture_label = CTkLabel(master=frame1, text=f"Facture N°{id}", font=my_font, fg_color="transparent", anchor="w")
-facture_label.grid(column=0, row=4, padx=paddings, pady=paddings, sticky="w")
+def num_fact():    
+    facture_label = CTkLabel(master=frame1, text=f"Facture N°{data.id}", font=my_font, fg_color="transparent", anchor="w")
+    facture_label.grid(column=0, row=4, padx=paddings, pady=paddings, sticky="w")
+num_fact()
 
 # date d'émission
 
