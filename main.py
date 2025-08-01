@@ -117,7 +117,6 @@ for row in mysql_connexion_config.cursor.fetchall():
 # Initialisation
 paddings = 5
 ctkbutton = 10
-leBoutonValiderEstCliquer = "non"
 
 # Récupérer le dernier id inséré dans info_client
 mysql_connexion_config.cursor.execute("SELECT MAX(id_client) FROM info_client")
@@ -223,7 +222,7 @@ def enregister():
             
             
             def terminer():
-                if data.etat_validation_produits and data.valeur_ref_bull_analyse != {} :
+                if data.etat_validation_produits != {} and data.valeur_ref_bull_analyse != {} and data.valeur_num_acte != {}:
                     mysql_connexion_config.cursor.execute("INSERT INTO info_client (raison_sociale, statistique, nif, adresse, date_emission, date_resultat, reference_des_produits, responsable) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                     (
                     raison_social_input.get(),
@@ -249,7 +248,7 @@ def enregister():
                             return  # ou gérer l'erreur proprement
                         
                         # récupérer l'ID du client
-                        cursor.execute("SELECT id_client FROM info_client WHERE raison_sociale = %s", (raison_social_input.get(),))
+                        cursor.execute("SELECT id_client FROM info_client WHERE raison_sociale = %s AND date_emission = %s", (raison_social_input.get(), date_emission_input.get()))
                         resultat_client = cursor.fetchone()   
                         
                         if resultat_client:
@@ -288,7 +287,7 @@ def enregister():
                     cursor_for_total = mysql_connexion_config.connexion.cursor()
                     
                     # récupérer l'ID du client
-                    cursor_for_total.execute("SELECT id_client FROM info_client WHERE raison_sociale = %s", (raison_social_input.get(),))
+                    cursor_for_total.execute("SELECT id_client FROM info_client WHERE raison_sociale = %s AND date_emission = %s", (raison_social_input.get(), date_emission_input.get()))
                     resultat_client = cursor_for_total.fetchone()
                     # Assure que tous les resultats sont lues avant la prochaine requête
                     while cursor_for_total.nextset():
@@ -301,7 +300,7 @@ def enregister():
                         cursor_for_total.close()
                         return
                     
-                    cursor_for_total.execute("INSERT INTO total(client_id, total) VALUES (%s, %s)", (id_client, total))
+                    cursor_for_total.execute("INSERT INTO total(client_id, total, date_emission) VALUES (%s, %s, (SELECT date_emission FROM info_client WHERE id_client = %s))", (id_client, total, id_client))
                     mysql_connexion_config.connexion.commit()
                     
                     
@@ -319,7 +318,7 @@ def enregister():
                     bouton_suivant.configure(state="disabled")
                     
                 else:
-                    CTkMessagebox(title="Error", message="Veuillez validez au moin un produit!", icon="cancel")
+                    CTkMessagebox(title="Error", message="Aucun produit validé ou réf. bulletin d'analyse est vide", icon="cancel")
             
             bouton_terminer = CTkButton(master=frame2, text="Terminer", width=ctkbutton, command=terminer)
             bouton_terminer.pack(side="right", anchor="se", padx=paddings, pady=paddings)
@@ -389,7 +388,8 @@ def enregister():
 
             produits = cursor.fetchall()
             
-            etat = {"click": True} 
+            etat = {"click": False}
+            
             if produits:
                 for produit_row in produits:
                     nom_produit, physico, micro, toxico, sous_total = produit_row
@@ -401,12 +401,24 @@ def enregister():
                     # Liste des produits disponibles
                     CTkLabel(master=row, text=nom_produit, width=label_width, wraplength=label_width, fg_color="transparent").pack(side="left", anchor="w", padx=5, pady=5)
 
-                    Ref_bull_var = IntVar()
-                    Ref_bull_analyse = CTkEntry(master=row, width=label_width, textvariable=Ref_bull_var, justify="right")
-                    Ref_bull_analyse.pack(side="left", anchor="w", padx=5, pady=5)
+    
+                    
+                    Ref_bull_var = IntVar(value=int(data.refbulltemporaire) if data.etat_validation_produits.get(nom_produit, False) else 0)
 
-                    Num_acte_var = StringVar()
-                    Num_acte = CTkEntry(master=row, width=label_width, textvariable=Num_acte_var, justify="right")
+                    Ref_bull_analyse = CTkEntry(master=row, width=label_width, textvariable=Ref_bull_var, justify="right", state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal")
+                    Ref_bull_analyse.pack(side="left", anchor="w", padx=5, pady=5)
+                    
+                    def make_keyrelease_handler(var):
+                        def handler(event):
+                            valeur = var.get()
+                            data.refbulltemporaire = valeur
+                            print(valeur)
+                        return handler
+
+                    Ref_bull_analyse.bind("<KeyRelease>", make_keyrelease_handler(Ref_bull_var))
+
+                    Num_acte_var = StringVar(value=nom_produit)
+                    Num_acte = CTkEntry(master=row, width=label_width, textvariable=Num_acte_var, justify="right", state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal")
                     Num_acte.pack(side="left", anchor="w", padx=5, pady=5)
 
                     Physico_var = DoubleVar(value=physico)
@@ -508,6 +520,7 @@ def enregister():
                         master=row,
                         text="Modifier",
                         width=ctkbutton,
+                        state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal",
                         command=lambda prod=nom_produit, p=Physico, m=Micro, t=Toxico, s=Sous_total, pv=Physico_var, mv=Micro_var, tv=Toxico_var, sv=Sous_total_var: modifier(prod, p, m, t, s, pv, mv, tv, sv)
                     )
                     bouton_modifier.pack(side="left", anchor="w", padx=5, pady=5)
@@ -523,10 +536,10 @@ def enregister():
                             widget.destroy()
                         choisir_la_categorie_et_afficher_les_produit(categorie_selectionne, frame_pour_affichage)
 
-                    bouton_suppr = CTkButton(master=row, text="suppr", width=ctkbutton, command=supprimer_produit)
+                    bouton_suppr = CTkButton(master=row, text="suppr", width=ctkbutton, command=supprimer_produit, state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal")
                     bouton_suppr.pack(side="left", anchor="w", padx=5, pady=5)
                     
-                    def valider_produit(prod, row, btn_m, btn_s, n_a, r_s):
+                    def valider_produit(prod, row, btn_m, btn_s, n_a, r_s, rba):
                         
                         
                         if etat["click"]:
@@ -534,10 +547,12 @@ def enregister():
                             btn_m.configure(state="disabled") 
                             btn_s.configure(state="disabled")
                             n_a.configure(state="disabled")
+                            rba.configure(state="disabled")
                             
                             data.etat_validation_produits[prod] = etat["click"]
                             
                             data.valeur_ref_bull_analyse[prod] = Ref_bull_var.get()
+                            
                             
                             data.valeur_num_acte[prod] = Num_acte_var.get()
                             
@@ -549,18 +564,19 @@ def enregister():
                             btn_m.configure(state="normal") 
                             btn_s.configure(state="normal")
                             n_a.configure(state="normal")
+                            rba.configure(state="normal")
                             
                             data.etat_validation_produits[prod] = etat["click"]
                             
-                            data.valeur_ref_bull_analyse[prod] = Ref_bull_var.set(0)
+                            data.valeur_ref_bull_analyse[prod] = 0
                             
-                            data.valeur_num_acte[prod] = Num_acte_var.set("")
+                            data.valeur_num_acte[prod] = ""
                             
                             etat["click"] = True
 
                             
                     
-                    valider_bouton = CTkButton(master=row, text="valider", width=ctkbutton, command=lambda prod=nom_produit, row=row, btn_m=bouton_modifier, btn_s=bouton_suppr, n_a=Num_acte, r_s=raison_social_input.get(): valider_produit(prod, row, btn_m, btn_s, n_a,r_s))
+                    valider_bouton = CTkButton(master=row, text="valider", width=ctkbutton, command=lambda prod=nom_produit, row=row, btn_m=bouton_modifier, btn_s=bouton_suppr, rba= Ref_bull_analyse, n_a=Num_acte, r_s=raison_social_input.get(): valider_produit(prod, row, btn_m, btn_s, n_a,r_s, rba))
                     valider_bouton.pack(side="left", anchor="w", padx=5, pady=5)
             else:
                 CTkLabel(master=frame_pour_affichage, text=f"Type de produit: {categorie_selectionne}", fg_color="transparent").pack(side="left", fill="both", expand=True)

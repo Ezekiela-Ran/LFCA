@@ -56,7 +56,7 @@ cursor.execute("""
     client_id INT NOT NULL,
     produit_id INT NOT NULL,
     ref_bull_analyse VARCHAR(50) NOT NULL,
-    num_acte VARCHAR(50) NOT NULL,
+    num_acte VARCHAR(50),
     physico INT,
     micro INT,
     toxico INT,
@@ -69,6 +69,7 @@ cursor.execute("""
     CREATE TABLE IF NOT EXISTS total (
     id_total INT AUTO_INCREMENT PRIMARY KEY,
     client_id INT NOT NULL,
+    date_emission DATE NOT NULL,
     total INT NOT NULL,
     FOREIGN KEY (client_id) REFERENCES info_client(id_client) ON DELETE CASCADE
 )""")
