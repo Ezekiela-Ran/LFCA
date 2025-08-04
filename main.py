@@ -387,54 +387,82 @@ def enregister():
         """, (categorie_selectionne,))
 
             produits = cursor.fetchall()
-            
-            etat = {"click": False}
-            
+                       
             if produits:
                 for produit_row in produits:
                     nom_produit, physico, micro, toxico, sous_total = produit_row
-                    row = CTkFrame(master=frame_pour_affichage, fg_color= "skyblue" if data.etat_validation_produits.get(nom_produit, False) else ['gray86', 'gray17'])
-                    etat_initial = {"border_width": row.cget("border_width"), "fg_color": row.cget("fg_color")}
+                    # Synchroniser est_valide avec data.etat_validation_produits
+                    est_valide = bool(data.etat_validation_produits.get(nom_produit, False))
                     
-                    row.pack(fill="x", padx=5, pady=5)
+                    rang = CTkFrame(
+                        master=frame_pour_affichage
+                    )
+                    rang.pack(fill="x", padx=5, pady=5)
                     
-                    # Liste des produits disponibles
-                    CTkLabel(master=row, text=nom_produit, width=label_width, wraplength=label_width, fg_color="transparent").pack(side="left", anchor="w", padx=5, pady=5)
+                    etat_initial = {"border_width": rang.cget("border_width"), "fg_color": rang.cget("fg_color")}
+                    
+                    CTkLabel(master=rang, text=nom_produit, width=label_width, wraplength=label_width, fg_color="transparent").pack(side="left", anchor="w", padx=5, pady=5)
 
-    
+                    valeur_ref = data.valeur_ref_bull_analyse.get(nom_produit, 0)
                     
-                    Ref_bull_var = IntVar(value=int(data.refbulltemporaire) if data.etat_validation_produits.get(nom_produit, False) else 0)
+                    try:
+                        Ref_bull_var = IntVar(value=int(valeur_ref))
+                    except (ValueError, TypeError):
+                        Ref_bull_var = IntVar(value=0)
+                        print("ref. bulletin analyse error!")
 
-                    Ref_bull_analyse = CTkEntry(master=row, width=label_width, textvariable=Ref_bull_var, justify="right", state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal")
+                    Ref_bull_analyse = CTkEntry(master=rang, width=label_width, textvariable=Ref_bull_var, justify="right", state="disabled" if est_valide else "normal")
                     Ref_bull_analyse.pack(side="left", anchor="w", padx=5, pady=5)
                     
-                    def make_keyrelease_handler(var):
+
+                    valeur_numActe = data.valeur_num_acte.get(nom_produit, "")
+                    try:
+                        Num_acte_var = StringVar(value=valeur_numActe if est_valide else "")
+                    except (ValueError, TypeError):
+                        Num_acte_var = StringVar(value="")
+                        print("ref. num acte error!")
+                        
+                    Num_acte = CTkEntry(master=rang, width=label_width, textvariable=Num_acte_var, justify="right", state="disabled" if est_valide else "normal")
+                    Num_acte.pack(side="left", anchor="w", padx=5, pady=5)
+                    
+                    def keyrelease_reference_b_analyse(var_ref, nom):
                         def handler(event):
-                            valeur = var.get()
-                            data.refbulltemporaire = valeur
-                            print(valeur)
+                            valeur1 = var_ref.get()
+                            
+                            print("La valeur de ref: ",valeur1 )
+                            if valeur1 != 0:
+                                data.valeur_ref_bull_analyse[nom] = valeur1
+                                
                         return handler
 
-                    Ref_bull_analyse.bind("<KeyRelease>", make_keyrelease_handler(Ref_bull_var))
-
-                    Num_acte_var = StringVar(value=nom_produit)
-                    Num_acte = CTkEntry(master=row, width=label_width, textvariable=Num_acte_var, justify="right", state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal")
-                    Num_acte.pack(side="left", anchor="w", padx=5, pady=5)
+                    Ref_bull_analyse.bind("<KeyRelease>", keyrelease_reference_b_analyse(Ref_bull_var, nom_produit))
+                    
+                    def keyrelease_num_acte(var_acte, nom):
+                        def handler(event):
+                            valeur = var_acte.get()
+                            
+                            print("La valeur du num acte: ",valeur)
+                            if valeur != "":
+                                data.valeur_num_acte[nom] = valeur
+                                
+                        return handler
+                    
+                    Num_acte.bind("<KeyRelease>", keyrelease_num_acte(Num_acte_var, nom_produit))
 
                     Physico_var = DoubleVar(value=physico)
-                    Physico = CTkEntry(master=row, state="disabled", width=label_width, justify="right", textvariable=Physico_var)
+                    Physico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Physico_var)
                     Physico.pack(side="left", anchor="w", padx=5, pady=5)
 
                     Micro_var = DoubleVar(value=micro)
-                    Micro = CTkEntry(master=row, state="disabled", width=label_width, justify="right", textvariable=Micro_var)
+                    Micro = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Micro_var)
                     Micro.pack(side="left", anchor="w", padx=5, pady=5)
 
                     Toxico_var = DoubleVar(value=toxico)
-                    Toxico = CTkEntry(master=row, state="disabled", width=label_width, justify="right", textvariable=Toxico_var)
+                    Toxico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Toxico_var)
                     Toxico.pack(side="left", anchor="w", padx=5, pady=5)
 
                     Sous_total_var = DoubleVar(value=sous_total)
-                    Sous_total = CTkEntry(master=row, state="disabled", width=label_width, justify="right", textvariable=Sous_total_var)
+                    Sous_total = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Sous_total_var)
                     Sous_total.pack(side="left", anchor="w", padx=5, pady=5)
 
                     def only_float(P):
@@ -442,7 +470,7 @@ def enregister():
                             return True
                         return False
 
-                    vcmd = (row.register(only_float), "%P")
+                    vcmd = (rang.register(only_float), "%P")
                     Physico.configure(validate="key", validatecommand=vcmd)
                     Micro.configure(validate="key", validatecommand=vcmd)
                     Toxico.configure(validate="key", validatecommand=vcmd)
@@ -516,11 +544,37 @@ def enregister():
                                 print("Veuillez entrer un nombre valide.")
                         Toxico.bind("<Return>", on_toxico_return)
 
+                    # Synchronisation du bouton valider/annuler avec est_valide
+                    def valider_produit(prod, rang, btn_m, btn_s, n_a, rba, valider_btn):
+                        est_valide = bool(data.etat_validation_produits.get(prod, False))
+                        print(est_valide)
+                        if not est_valide:
+                            rang.configure(border_width=1, fg_color=['skyblue','gray17'] )
+                            btn_m.configure(state="disabled") 
+                            btn_s.configure(state="disabled")
+                            n_a.configure(state="disabled")
+                            rba.configure(state="disabled")
+                
+                            data.etat_validation_produits[prod] = True
+                            valider_btn.configure(text="annuler")
+                        
+                            print("Le produit est maintenant valider", "ref: ", data.valeur_ref_bull_analyse.get(prod, 0), "num: ", data.valeur_num_acte.get(prod, ""))
+                        else:
+                            rang.configure(border_width=etat_initial["border_width"], fg_color=etat_initial["fg_color"])
+                            btn_m.configure(state="normal") 
+                            btn_s.configure(state="normal")
+                            n_a.configure(state="normal")
+                            rba.configure(state="normal")
+                            data.etat_validation_produits[prod] = False
+                            valider_btn.configure(text="valider")
+                            
+                            print("Le produit est maintenant annuler")
+
                     bouton_modifier = CTkButton(
-                        master=row,
+                        master=rang,
                         text="Modifier",
                         width=ctkbutton,
-                        state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal",
+                        
                         command=lambda prod=nom_produit, p=Physico, m=Micro, t=Toxico, s=Sous_total, pv=Physico_var, mv=Micro_var, tv=Toxico_var, sv=Sous_total_var: modifier(prod, p, m, t, s, pv, mv, tv, sv)
                     )
                     bouton_modifier.pack(side="left", anchor="w", padx=5, pady=5)
@@ -536,47 +590,17 @@ def enregister():
                             widget.destroy()
                         choisir_la_categorie_et_afficher_les_produit(categorie_selectionne, frame_pour_affichage)
 
-                    bouton_suppr = CTkButton(master=row, text="suppr", width=ctkbutton, command=supprimer_produit, state="disabled" if data.etat_validation_produits.get(nom_produit, False) else "normal")
+                    bouton_suppr = CTkButton(master=rang, text="suppr", width=ctkbutton, command=supprimer_produit)
                     bouton_suppr.pack(side="left", anchor="w", padx=5, pady=5)
                     
-                    def valider_produit(prod, row, btn_m, btn_s, n_a, r_s, rba):
-                        
-                        
-                        if etat["click"]:
-                            row.configure(border_width=1, fg_color="skyblue")
-                            btn_m.configure(state="disabled") 
-                            btn_s.configure(state="disabled")
-                            n_a.configure(state="disabled")
-                            rba.configure(state="disabled")
-                            
-                            data.etat_validation_produits[prod] = etat["click"]
-                            
-                            data.valeur_ref_bull_analyse[prod] = Ref_bull_var.get()
-                            
-                            
-                            data.valeur_num_acte[prod] = Num_acte_var.get()
-                            
-                            etat["click"] = False
-                           
-                        
-                        else:
-                            row.configure(border_width=etat_initial["border_width"], fg_color=etat_initial["fg_color"])
-                            btn_m.configure(state="normal") 
-                            btn_s.configure(state="normal")
-                            n_a.configure(state="normal")
-                            rba.configure(state="normal")
-                            
-                            data.etat_validation_produits[prod] = etat["click"]
-                            
-                            data.valeur_ref_bull_analyse[prod] = 0
-                            
-                            data.valeur_num_acte[prod] = ""
-                            
-                            etat["click"] = True
-
-                            
-                    
-                    valider_bouton = CTkButton(master=row, text="valider", width=ctkbutton, command=lambda prod=nom_produit, row=row, btn_m=bouton_modifier, btn_s=bouton_suppr, rba= Ref_bull_analyse, n_a=Num_acte, r_s=raison_social_input.get(): valider_produit(prod, row, btn_m, btn_s, n_a,r_s, rba))
+                    valider_bouton = CTkButton(
+                        master=rang,
+                        text="annuler" if est_valide else "valider",
+                        width=ctkbutton,
+                        command=lambda prod=nom_produit, r=rang, btn_m=bouton_modifier, btn_s=bouton_suppr, rba=Ref_bull_analyse, n_a=Num_acte: valider_produit(prod, r, btn_m, btn_s, n_a, rba)
+                    )
+                    # On doit passer le bouton lui-même à la fonction pour pouvoir changer son texte
+                    valider_bouton.configure(command=lambda prod=nom_produit, r=rang, btn_m=bouton_modifier, btn_s=bouton_suppr, rba=Ref_bull_analyse, n_a=Num_acte, valider_btn=valider_bouton: valider_produit(prod, r, btn_m, btn_s, n_a, rba, valider_btn))
                     valider_bouton.pack(side="left", anchor="w", padx=5, pady=5)
             else:
                 CTkLabel(master=frame_pour_affichage, text=f"Type de produit: {categorie_selectionne}", fg_color="transparent").pack(side="left", fill="both", expand=True)
