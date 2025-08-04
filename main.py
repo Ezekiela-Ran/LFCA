@@ -199,10 +199,14 @@ responsable_input = CTkEntry(master=frame1, textvariable=StringVar())
 responsable_input.grid(column=3, row=3, padx=paddings, pady=paddings)
 
 terminer = False
+_suivant = False
 
-def enregister():
+def suivant():
     global terminer 
+    global _suivant
+    _suivant = True
     terminer = True
+    btn_suivant()
     # Enregistrer les informations du client dans la base de données
     if raison_social_input.get() == "" or date_emission_input.get_date() == "" or date_du_resultat_input.get_date() == "" or responsable_input.get() == "":
             CTkMessagebox(title="Error", message="Veuillez complétez tous les champs obligatoires", icon="cancel")
@@ -429,7 +433,6 @@ def enregister():
                         def handler(event):
                             valeur1 = var_ref.get()
                             
-                            print("La valeur de ref: ",valeur1 )
                             if valeur1 != 0:
                                 data.valeur_ref_bull_analyse[nom] = valeur1
                                 
@@ -440,8 +443,7 @@ def enregister():
                     def keyrelease_num_acte(var_acte, nom):
                         def handler(event):
                             valeur = var_acte.get()
-                            
-                            print("La valeur du num acte: ",valeur)
+                          
                             if valeur != "":
                                 data.valeur_num_acte[nom] = valeur
                                 
@@ -558,7 +560,6 @@ def enregister():
                             data.etat_validation_produits[prod] = True
                             valider_btn.configure(text="annuler")
                         
-                            print("Le produit est maintenant valider", "ref: ", data.valeur_ref_bull_analyse.get(prod, 0), "num: ", data.valeur_num_acte.get(prod, ""))
                         else:
                             rang.configure(border_width=etat_initial["border_width"], fg_color=etat_initial["fg_color"])
                             btn_m.configure(state="normal") 
@@ -568,7 +569,6 @@ def enregister():
                             data.etat_validation_produits[prod] = False
                             valider_btn.configure(text="valider")
                             
-                            print("Le produit est maintenant annuler")
 
                     bouton_modifier = CTkButton(
                         master=rang,
@@ -660,9 +660,12 @@ def enregister():
         frame2_2_C = CTkScrollableFrame(master=frame2_2)
         frame2_2_C.pack(fill="both", expand=True, padx=paddings, pady=paddings)
                     
-
-bouton_suivant = CTkButton(master=frame1, command=enregister,text="Suivant", width=ctkbutton)
-bouton_suivant.grid(column=3, row=4, padx=paddings, pady=paddings)
+def btn_suivant():
+    bouton_suivant = CTkButton(master=frame1, command=suivant,text="Suivant", width=ctkbutton, state="disabled" if _suivant else "normal")
+    bouton_suivant.grid(column=3, row=4, padx=paddings, pady=paddings)
+    return bouton_suivant
+btn_suivant()
+bouton_suivant = btn_suivant()
 
 # CORP (body)
 if not terminer :
