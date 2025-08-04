@@ -37,6 +37,8 @@ cursor.execute("""
     FOREIGN KEY (produit_id) REFERENCES produits(id_produit) ON DELETE CASCADE
 )""")
 
+# id_client = numéro facture (Facture N°)
+
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS info_client (
     id_client INT AUTO_INCREMENT PRIMARY KEY,
