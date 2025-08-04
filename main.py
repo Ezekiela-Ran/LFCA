@@ -222,7 +222,7 @@ def enregister():
             
             
             def terminer():
-                if data.etat_validation_produits != {} and data.valeur_ref_bull_analyse != {} and data.valeur_num_acte != {}:
+                if data.etat_validation_produits != {} and data.valeur_ref_bull_analyse != {}:
                     mysql_connexion_config.cursor.execute("INSERT INTO info_client (raison_sociale, statistique, nif, adresse, date_emission, date_resultat, reference_des_produits, responsable) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                     (
                     raison_social_input.get(),
@@ -272,7 +272,7 @@ def enregister():
                         data.total[produit] = sous_total
                         
                         # insérer les données dans produit_analyse
-                        cursor.execute("""INSERT INTO produit_analyse (client_id, produit_id, ref_bull_analyse, num_acte, physico, micro, toxico, sous_total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", (id_client,id_produit, data.valeur_ref_bull_analyse[produit], data.valeur_num_acte[produit], physico, micro, toxico, sous_total))
+                        cursor.execute("""INSERT INTO produit_analyse (client_id, produit_id, ref_bull_analyse, num_acte, physico, micro, toxico, sous_total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", (id_client,id_produit, data.valeur_ref_bull_analyse[produit], data.valeur_num_acte.get(produit, ""), physico, micro, toxico, sous_total))
                         
                         mysql_connexion_config.connexion.commit()
                         cursor.close()
