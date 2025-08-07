@@ -468,19 +468,24 @@ def suivant():
                     Num_acte.bind("<KeyRelease>", keyrelease_num_acte(Num_acte_var, nom_produit))
 
                     Physico_var = DoubleVar(value=physico)
-                    Physico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Physico_var)
+                    physico_avec_separateur = StringVar(value=f"{int(Physico_var.get()):,}".replace(",", " "))
+                    Physico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=physico_avec_separateur)
                     Physico.pack(side="left", anchor="w", padx=5, pady=5)
 
                     Micro_var = DoubleVar(value=micro)
-                    Micro = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Micro_var)
+                    Micro_avec_separateur = StringVar(value=f"{int(Micro_var.get()):,}".replace(",", " "))
+                    Micro = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Micro_avec_separateur)
                     Micro.pack(side="left", anchor="w", padx=5, pady=5)
 
                     Toxico_var = DoubleVar(value=toxico)
-                    Toxico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Toxico_var)
+                    Toxico_avec_separateur = StringVar(value=f"{int(Toxico_var.get()):,}".replace(",", " "))
+                    Toxico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Toxico_avec_separateur)
                     Toxico.pack(side="left", anchor="w", padx=5, pady=5)
 
+
                     Sous_total_var = DoubleVar(value=sous_total)
-                    Sous_total = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Sous_total_var)
+                    Sous_total_avec_separateur = StringVar(value=f"{int(Sous_total_var.get()):,}".replace(",", " "))
+                    Sous_total = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Sous_total_avec_separateur)
                     Sous_total.pack(side="left", anchor="w", padx=5, pady=5)
 
                     def only_float(P):
@@ -494,11 +499,19 @@ def suivant():
                     Toxico.configure(validate="key", validatecommand=vcmd)
 
                     def modifier(nom_produit, Physico, Micro, Toxico, Sous_total, Physico_var, Micro_var, Toxico_var, Sous_total_var):
-                        Physico.configure(state="normal")
+                        
+                        Physico.configure(state="normal", textvariable=Physico_var)
+                        
                         Physico.focus_set()
+                        
                         def on_physico_return(event):
-                            Micro.configure(state="normal")
-                            Physico.configure(state="disabled")
+                            
+                            physico_avec_separateur = StringVar(value=f"{int(Physico_var.get()):,}".replace(",", " "))
+                            
+                            Physico.configure(state="disabled",textvariable=physico_avec_separateur)
+                            
+                            Micro.configure(state="normal", textvariable=Micro_var)
+                            
                             cursor.execute("""
                                 UPDATE produit_details d
                                 JOIN produits p ON d.id_produit_detail = p.id_produit
@@ -512,9 +525,15 @@ def suivant():
                             mysql_connexion_config.connexion.commit()
                             Micro.focus_set()
                         Physico.bind("<Return>", on_physico_return)
+                        
                         def on_micro_return(event):
-                            Toxico.configure(state="normal")
-                            Micro.configure(state="disabled")
+                            
+                            Micro_avec_separateur = StringVar(value=f"{int(Micro_var.get()):,}".replace(",", " "))
+                            
+                            Micro.configure(state="disabled", textvariable=Micro_avec_separateur)
+                            
+                            Toxico.configure(state="normal", textvariable=Toxico_var)
+                            
                             cursor.execute("""
                                 UPDATE produit_details d
                                 JOIN produits p ON d.id_produit_detail = p.id_produit
@@ -527,6 +546,7 @@ def suivant():
                             mysql_connexion_config.connexion.commit()
                             Toxico.focus_set()
                         Micro.bind("<Return>", on_micro_return)
+                        
                         def on_toxico_return(event):
                             try:
                                 cursor.execute("""
@@ -554,10 +574,16 @@ def suivant():
                                 )""",
                                 (sous_total_val, nom_produit, categorie_selectionne))
                                 mysql_connexion_config.connexion.commit()
-                                Sous_total.configure(state="disabled")
+                                
+                                Sous_total_avec_separateur = StringVar(value=f"{int(Sous_total_var.get()):,}".replace(",", " "))
+                                
+                                Sous_total.configure(state="disabled", textvariable=Sous_total_avec_separateur)
                                 Physico.configure(state="disabled")
                                 Micro.configure(state="disabled")
-                                Toxico.configure(state="disabled")
+                                
+                                Toxico_avec_separateur = StringVar(value=f"{int(Toxico_var.get()):,}".replace(",", " "))
+                                
+                                Toxico.configure(state="disabled", textvariable=Toxico_avec_separateur)
                             except ValueError:
                                 print("Veuillez entrer un nombre valide.")
                         Toxico.bind("<Return>", on_toxico_return)
