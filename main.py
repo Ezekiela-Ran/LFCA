@@ -14,6 +14,7 @@ import sys
 import subprocess
 import time
 import modeleFacture
+from num2words import num2words
 
 root = CTk()
 
@@ -218,12 +219,6 @@ def suivant():
         frame2.pack(padx=paddings, pady=paddings, anchor="w", expand=True, fill="both")
         
         def pied_de_page():
-            # mysql_connexion_config.cursor.execute("SELECT total FROM total WHERE client_id = ")
-            montant_a_payer = CTkLabel(master=frame2, text="Montant à payer: ")
-            montant_a_payer.pack(side="bottom", anchor="center")
-
-            bouton_imprimer = CTkButton(master=frame2, text="Imprimer", width=ctkbutton)
-            bouton_imprimer.pack(side="right", anchor="se", padx=paddings, pady=paddings)
             
             
             def terminer():
@@ -292,13 +287,16 @@ def suivant():
                     
                     # récupérer l'ID du client
                     id_client = data.id
-                    # Assure que tous les resultats sont lues avant la prochaine requête
-                    # while cursor_for_total.nextset():
-                    #     pass
-                        
                     
                     cursor_for_total.execute("INSERT INTO total(client_id, total) VALUES (%s, %s)", (id_client, total))
                     mysql_connexion_config.connexion.commit()
+                    
+                    # Montant à payer en lettre
+                    mysql_connexion_config.cursor.execute("SELECT total FROM total WHERE client_id = %s", (data.id,))
+                    montant = mysql_connexion_config.cursor.fetchone()
+                    montant_en_lettre = num2words(int(montant[0]), lang='fr', to='currency')
+                    montant_a_payer = CTkLabel(master=mframe, text=f"Montant à payer: {montant_en_lettre.upper()} Ariary ({montant[0]}Ar) ")
+                    montant_a_payer.pack(side="bottom", anchor="center")
                     
                     
                     #  Saisie de la facture
@@ -306,11 +304,7 @@ def suivant():
                     raison_social = mysql_connexion_config.cursor.fetchone()
                     
                     mysql_connexion_config.cursor.execute("SELECT p.nom_produit, pa.ref_bull_analyse, pa.num_acte, pa.physico, pa.micro, pa.toxico, pa.sous_total FROM produit_analyse pa JOIN produits p ON pa.client_id = %s AND p.id_produit = pa.produit_id", (data.id,))
-                    
-                    # Extraire la première valeur de chaque tuple
-                    # designations = [row[0] for row in mysql_connexion_config.cursor.fetchall()]
-                    
-                    # produit_analyser = mysql_connexion_config.cursor.fetchall()
+                
                     
                     produit_analyser = [
                         [designation, ref_analyse, num_acte, physico, micro, toxico, sous_total]
@@ -340,7 +334,7 @@ def suivant():
                     CTkMessagebox(title="Error", message="Aucun produit validé ou réf. bulletin d'analyse est vide", icon="cancel")
                     
                     
-            bouton_terminer = CTkButton(master=frame2, text="Terminer", width=ctkbutton, command=terminer)
+            bouton_terminer = CTkButton(master=frame2, text="Terminer et imprimer", width=ctkbutton, command=terminer)
             bouton_terminer.pack(side="right", anchor="se", padx=paddings, pady=paddings)
         pied_de_page()
 
@@ -431,17 +425,23 @@ def suivant():
                         Ref_bull_var = IntVar(value=0)
                         print("ref. bulletin analyse error!")
 
-                    Ref_bull_analyse = CTkEntry(master=rang, width=label_width, textvariable=Ref_bull_var, justify="right", state="disabled" if est_valide else "normal")
+                    def valider_entree(chiffre):
+                        return chiffre.isdigit() or chiffre == ""
+
+                    vcmd = (rang.register(valider_entree), '%P')   
+
+                    Ref_bull_analyse = CTkEntry(master=rang, width=label_width, textvariable=Ref_bull_var, justify="right", state="disabled" if est_valide else "normal", validate="key", validatecommand=vcmd)
                     Ref_bull_analyse.pack(side="left", anchor="w", padx=5, pady=5)
                     
 
                     valeur_numActe = data.valeur_num_acte.get(nom_produit, "")
                     try:
-                        Num_acte_var = StringVar(value=valeur_numActe if est_valide else "")
+                        Num_acte_var = StringVar(value=valeur_numActe)
                     except (ValueError, TypeError):
                         Num_acte_var = StringVar(value="")
                         print("ref. num acte error!")
-                        
+                      
+                    
                     Num_acte = CTkEntry(master=rang, width=label_width, textvariable=Num_acte_var, justify="right", state="disabled" if est_valide else "normal")
                     Num_acte.pack(side="left", anchor="w", padx=5, pady=5)
                     
