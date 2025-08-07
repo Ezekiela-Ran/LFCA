@@ -1,4 +1,3 @@
-from sqlite3 import Cursor
 from customtkinter import CTk, CTkFrame, CTkEntry, CTkButton, CTkScrollableFrame, CTkLabel, DoubleVar, CTkFont
 from customtkinter import StringVar, IntVar, CTkToplevel
 import customtkinter
@@ -14,6 +13,7 @@ from CTkMenuBar import *
 import sys
 import subprocess
 import time
+import modeleFacture
 
 root = CTk()
 
@@ -203,16 +203,17 @@ _suivant = False
 
 def suivant():
     global terminer 
-    global _suivant
-    _suivant = True
+    
     terminer = True
-    btn_suivant()
+    
     # Enregistrer les informations du client dans la base de données
     if raison_social_input.get() == "" or date_emission_input.get_date() == "" or date_du_resultat_input.get_date() == "" or responsable_input.get() == "":
             CTkMessagebox(title="Error", message="Veuillez complétez tous les champs obligatoires", icon="cancel")
             return
     else:
-
+        global _suivant
+        _suivant = True
+        btn_suivant()
         frame2 = CTkFrame(master=mframe, border_width=1, border_color="gray")
         frame2.pack(padx=paddings, pady=paddings, anchor="w", expand=True, fill="both")
         
@@ -239,7 +240,8 @@ def suivant():
                     responsable_input.get() ))
                     mysql_connexion_config.connexion.commit()
                     
-                    for produit in data.etat_validation_produits:
+                    for produit in data.etat_validation_produits.keys():
+                        
                         cursor = mysql_connexion_config.connexion.cursor(buffered=True)
                         cursor.execute("SELECT id_produit FROM produits WHERE nom_produit = %s", (produit,))
                         resultat = cursor.fetchone()
@@ -252,14 +254,12 @@ def suivant():
                             return  # ou gérer l'erreur proprement
                         
                         # récupérer l'ID du client
-                        cursor.execute("SELECT id_client FROM info_client WHERE raison_sociale = %s AND date_emission = %s", (raison_social_input.get(), date_emission_input.get()))
-                        resultat_client = cursor.fetchone()   
+                        resultat_client = data.id 
                         
                         if resultat_client:
-                            id_client = resultat_client[0]
+                            id_client = resultat_client
                         else:
                             print("Client introuvable")
-                            cursor.close()
                             return
                         
                         # récupérer les détails du produit
@@ -291,21 +291,35 @@ def suivant():
                     cursor_for_total = mysql_connexion_config.connexion.cursor()
                     
                     # récupérer l'ID du client
-                    cursor_for_total.execute("SELECT id_client FROM info_client WHERE raison_sociale = %s AND date_emission = %s", (raison_social_input.get(), date_emission_input.get()))
-                    resultat_client = cursor_for_total.fetchone()
+                    id_client = data.id
                     # Assure que tous les resultats sont lues avant la prochaine requête
-                    while cursor_for_total.nextset():
-                        pass
+                    # while cursor_for_total.nextset():
+                    #     pass
                         
-                    if resultat_client:
-                        id_client = resultat_client[0]
-                    else:
-                        print("Client introuvable")
-                        cursor_for_total.close()
-                        return
                     
-                    cursor_for_total.execute("INSERT INTO total(client_id, total, date_emission) VALUES (%s, %s, (SELECT date_emission FROM info_client WHERE id_client = %s))", (id_client, total, id_client))
+                    cursor_for_total.execute("INSERT INTO total(client_id, total) VALUES (%s, %s)", (id_client, total))
                     mysql_connexion_config.connexion.commit()
+                    
+                    
+                    #  Saisie de la facture
+                    mysql_connexion_config.cursor.execute("SELECT raison_sociale FROM info_client WHERE id_client=%s",(data.id,))
+                    raison_social = mysql_connexion_config.cursor.fetchone()
+                    
+                    mysql_connexion_config.cursor.execute("SELECT p.nom_produit, pa.ref_bull_analyse, pa.num_acte, pa.physico, pa.micro, pa.toxico, pa.sous_total FROM produit_analyse pa JOIN produits p ON pa.client_id = %s AND p.id_produit = pa.produit_id", (data.id,))
+                    
+                    # Extraire la première valeur de chaque tuple
+                    # designations = [row[0] for row in mysql_connexion_config.cursor.fetchall()]
+                    
+                    # produit_analyser = mysql_connexion_config.cursor.fetchall()
+                    
+                    produit_analyser = [
+                        [designation, ref_analyse, num_acte, physico, micro, toxico, sous_total]
+                        for designation, ref_analyse, num_acte, physico, micro, toxico, sous_total in mysql_connexion_config.cursor.fetchall()
+                    ]
+
+                    
+                    if len(data.etat_validation_produits) <= 23:
+                        modeleFacture.saisir_facture(raison_social[0], produit_analyser)
                     
                     
                     
@@ -320,10 +334,12 @@ def suivant():
                         widget.destroy()
                     
                     bouton_suivant.configure(state="disabled")
+                
                     
                 else:
                     CTkMessagebox(title="Error", message="Aucun produit validé ou réf. bulletin d'analyse est vide", icon="cancel")
-            
+                    
+                    
             bouton_terminer = CTkButton(master=frame2, text="Terminer", width=ctkbutton, command=terminer)
             bouton_terminer.pack(side="right", anchor="se", padx=paddings, pady=paddings)
         pied_de_page()
@@ -549,7 +565,6 @@ def suivant():
                     # Synchronisation du bouton valider/annuler avec est_valide
                     def valider_produit(prod, rang, btn_m, btn_s, n_a, rba, valider_btn):
                         est_valide = bool(data.etat_validation_produits.get(prod, False))
-                        print(est_valide)
                         if not est_valide:
                             rang.configure(border_width=1, fg_color=['skyblue','gray17'] )
                             btn_m.configure(state="disabled") 
@@ -566,7 +581,7 @@ def suivant():
                             btn_s.configure(state="normal")
                             n_a.configure(state="normal")
                             rba.configure(state="normal")
-                            data.etat_validation_produits[prod] = False
+                            del data.etat_validation_produits[prod]
                             valider_btn.configure(text="valider")
                             
 
