@@ -7,6 +7,7 @@ from tkcalendar import DateEntry
 from modalAjouterCategorie import ModalAjouterCategorie
 from modalAjouterProduit import ModalAjouterProduit
 from modalModifierNumFacture import ModalModifierNumFacture
+from modalRechercherModifierFacture import ModalRechercherModifierFacture
 import data
 import mysql_connexion_config
 from CTkMenuBar import *
@@ -63,7 +64,11 @@ def relance_fantôme():
 dropdown = CustomDropdownMenu(widget=menu_fichier)
 
 dropdown.add_option(option="Nouveau", command=relance_fantôme)
-dropdown.add_option(option="Aperçu") 
+
+def rechercher_facture():
+    ModalRechercherModifierFacture(parent=root)
+
+dropdown.add_option(option="Rechercher facture", command=rechercher_facture) 
 
 dropdown1 = CustomDropdownMenu(widget=menu_theme)
 dropdown1.add_option(option="sombre", command=lambda: customtkinter.set_appearance_mode("dark")) 
@@ -199,519 +204,501 @@ responsable_label.grid(column=2, row=3, padx=paddings, pady=paddings, sticky="w"
 responsable_input = CTkEntry(master=frame1, textvariable=StringVar())
 responsable_input.grid(column=3, row=3, padx=paddings, pady=paddings)
 
-terminer = False
-_suivant = False
 
-def suivant():
-    global terminer 
-    
-    terminer = True
-    
-    # Enregistrer les informations du client dans la base de données
-    if raison_social_input.get() == "" or date_emission_input.get_date() == "" or date_du_resultat_input.get_date() == "" or responsable_input.get() == "":
-            CTkMessagebox(title="Error", message="Veuillez complétez tous les champs obligatoires", icon="cancel")
-            return
-    else:
-        global _suivant
-        _suivant = True
-        btn_suivant()
-        frame2 = CTkFrame(master=mframe, border_width=1, border_color="gray")
-        frame2.pack(padx=paddings, pady=paddings, anchor="w", expand=True, fill="both")
-        
-        def pied_de_page():
-            
-            
-            def terminer():
-                if data.etat_validation_produits != {} and data.valeur_ref_bull_analyse != {}:
-                    mysql_connexion_config.cursor.execute("INSERT INTO info_client (raison_sociale, statistique, nif, adresse, date_emission, date_resultat, reference_des_produits, responsable) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                    (
-                    raison_social_input.get(),
-                    statistique_input.get() if statistique_input.get() != "" else None,
-                    nif_input.get() if nif_input.get() != "" else None,
-                    adresse_input.get()if adresse_input.get() != "" else None,
-                    date_emission_input.get_date(),
-                    date_du_resultat_input.get_date(),
-                    reference_des_produits_input.get(),
-                    responsable_input.get() ))
-                    mysql_connexion_config.connexion.commit()
-                    
-                    for produit in data.etat_validation_produits.keys():
-                        
-                        cursor = mysql_connexion_config.connexion.cursor(buffered=True)
-                        cursor.execute("SELECT id_produit FROM produits WHERE nom_produit = %s", (produit,))
-                        resultat = cursor.fetchone()
-                        
-                        if resultat:
-                            id_produit = resultat[0]
-                        else:
-                            print("Produit introuvable")
-                            cursor.close()
-                            return  # ou gérer l'erreur proprement
-                        
-                        # récupérer l'ID du client
-                        resultat_client = data.id 
-                        
-                        if resultat_client:
-                            id_client = resultat_client
-                        else:
-                            print("Client introuvable")
-                            return
-                        
-                        # récupérer les détails du produit
-                        cursor.execute("""SELECT physico, micro, toxico, sous_total FROM produit_details WHERE produit_id = %s """, (id_produit,))
-                        details = cursor.fetchone()
-                            
-                        if not details:
-                            print("Détails du produit introuvables")
-                            cursor.close()
-                            return
-                            
-                        physico, micro, toxico, sous_total = details
-                        
-                        data.total[produit] = sous_total
-                        
-                        # insérer les données dans produit_analyse
-                        cursor.execute("""INSERT INTO produit_analyse (client_id, produit_id, ref_bull_analyse, num_acte, physico, micro, toxico, sous_total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", (id_client,id_produit, data.valeur_ref_bull_analyse[produit], data.valeur_num_acte.get(produit, ""), physico, micro, toxico, sous_total))
-                        
-                        mysql_connexion_config.connexion.commit()
-                        cursor.close()
-        
-                    total = 0
-                    for sous_total in data.total.values():
-                        try:
-                            total += float(sous_total)
-                        except (ValueError, TypeError):
-                            print(f"Erreur: sous_total non numérique ({sous_total}) ignoré.")
-                    
-                    cursor_for_total = mysql_connexion_config.connexion.cursor()
-                    
-                    # récupérer l'ID du client
-                    id_client = data.id
-                    
-                    cursor_for_total.execute("INSERT INTO total(client_id, total) VALUES (%s, %s)", (id_client, total))
-                    mysql_connexion_config.connexion.commit()
-                    
-                    # Montant à payer en lettre
-                    mysql_connexion_config.cursor.execute("SELECT total FROM total WHERE client_id = %s", (data.id,))
-                    montant = mysql_connexion_config.cursor.fetchone()
-                    montant_en_lettre = num2words(int(montant[0]), lang='fr', to='currency')
-                    montant_a_payer = CTkLabel(master=mframe, text=f"Montant à payer: {montant_en_lettre.upper()} Ariary ({montant[0]}Ar) ")
-                    montant_a_payer.pack(side="bottom", anchor="center")
-                    
-                    
-                    #  Saisie de la facture
-                    mysql_connexion_config.cursor.execute("SELECT raison_sociale FROM info_client WHERE id_client=%s",(data.id,))
-                    raison_social = mysql_connexion_config.cursor.fetchone()
-                    
-                    mysql_connexion_config.cursor.execute("SELECT p.nom_produit, pa.ref_bull_analyse, pa.num_acte, pa.physico, pa.micro, pa.toxico, pa.sous_total FROM produit_analyse pa JOIN produits p ON pa.client_id = %s AND p.id_produit = pa.produit_id", (data.id,))
-                
-                    
-                    produit_analyser = [
-                        [designation, ref_analyse, num_acte, physico, micro, toxico, sous_total]
-                        for designation, ref_analyse, num_acte, physico, micro, toxico, sous_total in mysql_connexion_config.cursor.fetchall()
-                    ]
 
-                    
-                    if len(data.etat_validation_produits) <= 23:
-                        modeleFacture.saisir_facture(raison_social[0], produit_analyser)
-                    
-                    
-                    
-                    data.etat_validation_produits.clear()
-                    data.valeur_ref_bull_analyse.clear()
-                    data.valeur_num_acte.clear()
-                    data.total.clear()
-                    CTkMessagebox(message=f"Enregistrement effectué avec succès!\n Total: {total}",
-                  icon="check", option_1="Fermer")
-                    
-                    for widget in frame2.winfo_children():
-                        widget.destroy()
-                    
-                    bouton_suivant.configure(state="disabled")
+# CORPS 
+
+frame2 = CTkFrame(master=mframe, border_width=1, border_color="gray")
+frame2.pack(padx=paddings, pady=paddings, anchor="w", expand=True, fill="both")
+
+def pied_de_page():
+    
+    def terminer():
+        if (
+            raison_social_input.get() != "" and
+            date_emission_input.get_date() != "" and
+            date_du_resultat_input.get_date() != "" and
+            responsable_input.get() != ""
+            ) and (
+            data.etat_validation_produits != {} and
+            data.valeur_ref_bull_analyse != {}
+            ):
                 
-                    
+            mysql_connexion_config.cursor.execute("INSERT INTO info_client (raison_sociale, statistique, nif, adresse, date_emission, date_resultat, reference_des_produits, responsable) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+            raison_social_input.get(),
+            statistique_input.get() if statistique_input.get() != "" else None,
+            nif_input.get() if nif_input.get() != "" else None,
+            adresse_input.get()if adresse_input.get() != "" else None,
+            date_emission_input.get_date(),
+            date_du_resultat_input.get_date(),
+            reference_des_produits_input.get(),
+            responsable_input.get() ))
+            mysql_connexion_config.connexion.commit()
+            
+            for produit in data.etat_validation_produits.keys():
+                
+                cursor = mysql_connexion_config.connexion.cursor(buffered=True)
+                cursor.execute("SELECT id_produit FROM produits WHERE nom_produit = %s", (produit,))
+                resultat = cursor.fetchone()
+                
+                if resultat:
+                    id_produit = resultat[0]
                 else:
-                    CTkMessagebox(title="Error", message="Aucun produit validé ou réf. bulletin d'analyse est vide", icon="cancel")
-                    
-                    
-            bouton_terminer = CTkButton(master=frame2, text="Terminer et imprimer", width=ctkbutton, command=terminer)
-            bouton_terminer.pack(side="right", anchor="se", padx=paddings, pady=paddings)
-        pied_de_page()
-
-        # SUB SECTION 2-1 (Première colonne)
-
-        frame2_1 = CTkFrame(master=frame2)
-        frame2_1.pack(padx=paddings, pady=paddings, fill="both", side="left")
-
-        frame2_1_A = CTkFrame(master=frame2_1)
-        frame2_1_A.pack(fill="x", padx=paddings, pady=paddings)
-
-        product_type_label = CTkLabel(master=frame2_1_A, text="TYPE DE PRODUIT",fg_color="transparent")
-        product_type_label.pack(side="left", padx=paddings, pady=paddings)
-
-        # Ajouter un type de produit "MODAL WINDOW"
-
-        
-        def ajouter_un_categorie():
-            ModalAjouterCategorie(master=root, frame=frame2_1_B, callback=afficher_categories)
-
-        bouton_ajouter_categorie = CTkButton(master=frame2_1_A, text="Ajouter", command=ajouter_un_categorie, width=ctkbutton)
-        bouton_ajouter_categorie.pack(side="right", padx=paddings, pady=paddings)
-
-        # Supprimer un Catégorie
-        def supp_categorie():
-            
-            for categorie in list(data.produit_par_categorie.keys()): 
-                if categorie == categorie_selectionne:
-                    mysql_connexion_config.cursor.execute(
-                        "DELETE FROM categories WHERE nom_categorie = %s",
-                        (categorie_selectionne,)
-                    )
-                    mysql_connexion_config.connexion.commit()
-                    del data.produit_par_categorie[categorie_selectionne]
-                    
-                    for widget in frame2_1_B.winfo_children():
-                        widget.destroy()
-                    for widget in frame2_2_C.winfo_children():
-                        widget.destroy()
-                    afficher_categories()
-                    break
-
-        bouton_supprimer_categorie = CTkButton(master=frame2_1_A, text="Supprimer", command=supp_categorie, width=ctkbutton)
-        bouton_supprimer_categorie.pack(side="right", padx=paddings, pady=paddings)
-
-        frame2_1_B = CTkScrollableFrame(master=frame2_1)
-        frame2_1_B.pack(padx=paddings, pady=paddings, expand=True, fill="both", anchor="nw")
-
-        # Sélection et affichage du type de produit
-        def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage):
-            global categorie_selectionne
-            categorie_selectionne = categorie
-            for widget in frame_pour_affichage.winfo_children():
-                widget.destroy()
-            cursor = mysql_connexion_config.cursor
-            # Récupérer les produits de la catégorie depuis la base
-            cursor.execute("""
-            SELECT p.nom_produit, d.physico, d.micro, d.toxico, d.sous_total
-            FROM produits p
-            JOIN produit_details d ON p.id_produit = d.id_produit_detail
-            WHERE p.categorie_id = (
-                SELECT id_categorie FROM categories WHERE nom_categorie = %s
-            )
-        """, (categorie_selectionne,))
-
-            produits = cursor.fetchall()
-                       
-            if produits:
-                for produit_row in produits:
-                    nom_produit, physico, micro, toxico, sous_total = produit_row
-                    # Synchroniser est_valide avec data.etat_validation_produits
-                    est_valide = bool(data.etat_validation_produits.get(nom_produit, False))
-                    
-                    rang = CTkFrame(
-                        master=frame_pour_affichage
-                    )
-                    rang.pack(fill="x", padx=5, pady=5)
-                    
-                    etat_initial = {"border_width": rang.cget("border_width"), "fg_color": rang.cget("fg_color")}
-                    
-                    CTkLabel(master=rang, text=nom_produit, width=label_width, wraplength=label_width, fg_color="transparent").pack(side="left", anchor="w", padx=5, pady=5)
-
-                    valeur_ref = data.valeur_ref_bull_analyse.get(nom_produit, 0)
-                    
-                    try:
-                        Ref_bull_var = IntVar(value=int(valeur_ref))
-                    except (ValueError, TypeError):
-                        Ref_bull_var = IntVar(value=0)
-                        print("ref. bulletin analyse error!")
-
-                    def valider_entree(chiffre):
-                        return chiffre.isdigit() or chiffre == ""
-
-                    vcmd = (rang.register(valider_entree), '%P')   
-
-                    Ref_bull_analyse = CTkEntry(master=rang, width=label_width, textvariable=Ref_bull_var, justify="right", state="disabled" if est_valide else "normal", validate="key", validatecommand=vcmd)
-                    Ref_bull_analyse.pack(side="left", anchor="w", padx=5, pady=5)
-                    
-
-                    valeur_numActe = data.valeur_num_acte.get(nom_produit, "")
-                    try:
-                        Num_acte_var = StringVar(value=valeur_numActe)
-                    except (ValueError, TypeError):
-                        Num_acte_var = StringVar(value="")
-                        print("ref. num acte error!")
-                      
-                    
-                    Num_acte = CTkEntry(master=rang, width=label_width, textvariable=Num_acte_var, justify="right", state="disabled" if est_valide else "normal")
-                    Num_acte.pack(side="left", anchor="w", padx=5, pady=5)
-                    
-                    def keyrelease_reference_b_analyse(var_ref, nom):
-                        def handler(event):
-                            valeur1 = var_ref.get()
-                            
-                            if valeur1 != 0:
-                                data.valeur_ref_bull_analyse[nom] = valeur1
-                                
-                        return handler
-
-                    Ref_bull_analyse.bind("<KeyRelease>", keyrelease_reference_b_analyse(Ref_bull_var, nom_produit))
-                    
-                    def keyrelease_num_acte(var_acte, nom):
-                        def handler(event):
-                            valeur = var_acte.get()
-                          
-                            if valeur != "":
-                                data.valeur_num_acte[nom] = valeur
-                                
-                        return handler
-                    
-                    Num_acte.bind("<KeyRelease>", keyrelease_num_acte(Num_acte_var, nom_produit))
-
-                    Physico_var = DoubleVar(value=physico)
-                    physico_avec_separateur = StringVar(value=f"{int(Physico_var.get()):,}".replace(",", " "))
-                    Physico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=physico_avec_separateur)
-                    Physico.pack(side="left", anchor="w", padx=5, pady=5)
-
-                    Micro_var = DoubleVar(value=micro)
-                    Micro_avec_separateur = StringVar(value=f"{int(Micro_var.get()):,}".replace(",", " "))
-                    Micro = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Micro_avec_separateur)
-                    Micro.pack(side="left", anchor="w", padx=5, pady=5)
-
-                    Toxico_var = DoubleVar(value=toxico)
-                    Toxico_avec_separateur = StringVar(value=f"{int(Toxico_var.get()):,}".replace(",", " "))
-                    Toxico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Toxico_avec_separateur)
-                    Toxico.pack(side="left", anchor="w", padx=5, pady=5)
-
-
-                    Sous_total_var = DoubleVar(value=sous_total)
-                    Sous_total_avec_separateur = StringVar(value=f"{int(Sous_total_var.get()):,}".replace(",", " "))
-                    Sous_total = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Sous_total_avec_separateur)
-                    Sous_total.pack(side="left", anchor="w", padx=5, pady=5)
-
-                    def only_float(P):
-                        if P == "" or P.replace(".", "", 1).isdigit():
-                            return True
-                        return False
-
-                    vcmd = (rang.register(only_float), "%P")
-                    Physico.configure(validate="key", validatecommand=vcmd)
-                    Micro.configure(validate="key", validatecommand=vcmd)
-                    Toxico.configure(validate="key", validatecommand=vcmd)
-
-                    def modifier(nom_produit, Physico, Micro, Toxico, Sous_total, Physico_var, Micro_var, Toxico_var, Sous_total_var):
-                        
-                        Physico.configure(state="normal", textvariable=Physico_var)
-                        
-                        Physico.focus_set()
-                        
-                        def on_physico_return(event):
-                            
-                            physico_avec_separateur = StringVar(value=f"{int(Physico_var.get()):,}".replace(",", " "))
-                            
-                            Physico.configure(state="disabled",textvariable=physico_avec_separateur)
-                            
-                            Micro.configure(state="normal", textvariable=Micro_var)
-                            
-                            cursor.execute("""
-                                UPDATE produit_details d
-                                JOIN produits p ON d.id_produit_detail = p.id_produit
-                                SET d.physico = %s
-                                WHERE p.nom_produit = %s
-                                AND p.categorie_id = (
-                                SELECT id_categorie FROM categories WHERE nom_categorie = %s
-                            )""",
-                            (Physico_var.get(), nom_produit, categorie_selectionne))
-
-                            mysql_connexion_config.connexion.commit()
-                            Micro.focus_set()
-                        Physico.bind("<Return>", on_physico_return)
-                        
-                        def on_micro_return(event):
-                            
-                            Micro_avec_separateur = StringVar(value=f"{int(Micro_var.get()):,}".replace(",", " "))
-                            
-                            Micro.configure(state="disabled", textvariable=Micro_avec_separateur)
-                            
-                            Toxico.configure(state="normal", textvariable=Toxico_var)
-                            
-                            cursor.execute("""
-                                UPDATE produit_details d
-                                JOIN produits p ON d.id_produit_detail = p.id_produit
-                                SET d.micro = %s
-                                WHERE p.nom_produit = %s
-                                AND p.categorie_id = (
-                                SELECT id_categorie FROM categories WHERE nom_categorie = %s
-                            )""",
-                            (Micro_var.get(), nom_produit, categorie_selectionne))
-                            mysql_connexion_config.connexion.commit()
-                            Toxico.focus_set()
-                        Micro.bind("<Return>", on_micro_return)
-                        
-                        def on_toxico_return(event):
-                            try:
-                                cursor.execute("""
-                                    UPDATE produit_details d
-                                    JOIN produits p ON d.id_produit_detail = p.id_produit
-                                    SET d.toxico = %s
-                                    WHERE p.nom_produit = %s
-                                    AND p.categorie_id = (
-                                    SELECT id_categorie FROM categories WHERE nom_categorie = %s
-                                )""",
-                                (Toxico_var.get(), nom_produit, categorie_selectionne))
-                                
-                                physico_val = float(Physico_var.get())
-                                micro_val = float(Micro_var.get())
-                                toxico_val = float(Toxico_var.get())
-                                sous_total_val = physico_val + micro_val + toxico_val
-                                Sous_total_var.set(sous_total_val)
-                                cursor.execute("""
-                                    UPDATE produit_details d
-                                    JOIN produits p ON d.produit_id = p.id_produit
-                                    SET d.sous_total = %s
-                                    WHERE p.nom_produit = %s
-                                    AND p.categorie_id = (
-                                    SELECT id_categorie FROM categories WHERE nom_categorie = %s
-                                )""",
-                                (sous_total_val, nom_produit, categorie_selectionne))
-                                mysql_connexion_config.connexion.commit()
-                                
-                                Sous_total_avec_separateur = StringVar(value=f"{int(Sous_total_var.get()):,}".replace(",", " "))
-                                
-                                Sous_total.configure(state="disabled", textvariable=Sous_total_avec_separateur)
-                                Physico.configure(state="disabled")
-                                Micro.configure(state="disabled")
-                                
-                                Toxico_avec_separateur = StringVar(value=f"{int(Toxico_var.get()):,}".replace(",", " "))
-                                
-                                Toxico.configure(state="disabled", textvariable=Toxico_avec_separateur)
-                            except ValueError:
-                                print("Veuillez entrer un nombre valide.")
-                        Toxico.bind("<Return>", on_toxico_return)
-
-                    # Synchronisation du bouton valider/annuler avec est_valide
-                    def valider_produit(prod, rang, btn_m, btn_s, n_a, rba, valider_btn):
-                        est_valide = bool(data.etat_validation_produits.get(prod, False))
-                        if not est_valide:
-                            rang.configure(border_width=1, fg_color=['skyblue','gray17'] )
-                            btn_m.configure(state="disabled") 
-                            btn_s.configure(state="disabled")
-                            n_a.configure(state="disabled")
-                            rba.configure(state="disabled")
+                    print("Produit introuvable")
+                    cursor.close()
+                    return  # ou gérer l'erreur proprement
                 
-                            data.etat_validation_produits[prod] = True
-                            valider_btn.configure(text="annuler")
-                        
-                        else:
-                            rang.configure(border_width=etat_initial["border_width"], fg_color=etat_initial["fg_color"])
-                            btn_m.configure(state="normal") 
-                            btn_s.configure(state="normal")
-                            n_a.configure(state="normal")
-                            rba.configure(state="normal")
-                            del data.etat_validation_produits[prod]
-                            valider_btn.configure(text="valider")
-                            
+                # récupérer l'ID du client
+                resultat_client = data.id 
+                
+                if resultat_client:
+                    id_client = resultat_client
+                else:
+                    print("Client introuvable")
+                    return
+                
+                # récupérer les détails du produit
+                cursor.execute("""SELECT physico, micro, toxico, sous_total FROM produit_details WHERE produit_id = %s """, (id_produit,))
+                details = cursor.fetchone()
+                    
+                if not details:
+                    print("Détails du produit introuvables")
+                    cursor.close()
+                    return
+                    
+                physico, micro, toxico, sous_total = details
+                
+                data.total[produit] = sous_total
+                
+                # insérer les données dans produit_analyse
+                cursor.execute("""INSERT INTO produit_analyse (client_id, produit_id, ref_bull_analyse, num_acte, physico, micro, toxico, sous_total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", (id_client,id_produit, data.valeur_ref_bull_analyse[produit], data.valeur_num_acte.get(produit, ""), physico, micro, toxico, sous_total))
+                
+                mysql_connexion_config.connexion.commit()
+                cursor.close()
 
-                    bouton_modifier = CTkButton(
-                        master=rang,
-                        text="Modifier",
-                        width=ctkbutton,
-                        
-                        command=lambda prod=nom_produit, p=Physico, m=Micro, t=Toxico, s=Sous_total, pv=Physico_var, mv=Micro_var, tv=Toxico_var, sv=Sous_total_var: modifier(prod, p, m, t, s, pv, mv, tv, sv)
-                    )
-                    bouton_modifier.pack(side="left", anchor="w", padx=5, pady=5)
+            total = 0
+            for sous_total in data.total.values():
+                try:
+                    total += float(sous_total)
+                except (ValueError, TypeError):
+                    print(f"Erreur: sous_total non numérique ({sous_total}) ignoré.")
+            
+            cursor_for_total = mysql_connexion_config.connexion.cursor()
+            
+            # récupérer l'ID du client
+            id_client = data.id
+            
+            cursor_for_total.execute("INSERT INTO total(client_id, total) VALUES (%s, %s)", (id_client, total))
+            mysql_connexion_config.connexion.commit()
+            
+            # Montant à payer en lettre
+            mysql_connexion_config.cursor.execute("SELECT total FROM total WHERE client_id = %s", (data.id,))
+            montant = mysql_connexion_config.cursor.fetchone()
+            montant_en_lettre = num2words(int(montant[0]), lang='fr', to='currency')
+            montant_a_payer = CTkLabel(master=mframe, text=f"Montant à payer: {montant_en_lettre.upper()} Ariary ({montant[0]}Ar) ")
+            montant_a_payer.pack(side="bottom", anchor="center")
+            
+            
+            #  Saisie de la facture
+            mysql_connexion_config.cursor.execute("SELECT raison_sociale FROM info_client WHERE id_client=%s",(data.id,))
+            raison_social = mysql_connexion_config.cursor.fetchone()
+            
+            mysql_connexion_config.cursor.execute("SELECT p.nom_produit, pa.ref_bull_analyse, pa.num_acte, pa.physico, pa.micro, pa.toxico, pa.sous_total FROM produit_analyse pa JOIN produits p ON pa.client_id = %s AND p.id_produit = pa.produit_id", (data.id,))
+        
+            
+            produit_analyser = [
+                [designation, ref_analyse, num_acte, physico, micro, toxico, sous_total]
+                for designation, ref_analyse, num_acte, physico, micro, toxico, sous_total in mysql_connexion_config.cursor.fetchall()
+            ]
 
-                    def supprimer_produit():
-                        cursor.execute(
-                            "DELETE FROM produits WHERE nom_produit = %s AND categorie_id = (SELECT id_categorie FROM categories WHERE nom_categorie = %s)",
-                            (nom_produit, categorie_selectionne)
-                        )
+            
+            if len(data.etat_validation_produits) <= 23:
+                modeleFacture.saisir_facture(raison_social[0], produit_analyser)
+            
+            
+            
+            data.etat_validation_produits.clear()
+            data.valeur_ref_bull_analyse.clear()
+            data.valeur_num_acte.clear()
+            data.total.clear()
+            CTkMessagebox(message=f"Enregistrement effectué avec succès!\n Total: {total}",
+            icon="check", option_1="Fermer")
+            
+            for widget in frame2.winfo_children():
+                widget.destroy()
+        
+         
+        else:
+            CTkMessagebox(title="Error", message="Champs obligatoires non remplis ou aucun produit validé ou réf. bulletin d'analyse nulle", icon="cancel")
+            
+            
+    bouton_terminer = CTkButton(master=frame2, text="Terminer et imprimer", width=ctkbutton, command=terminer)
+    bouton_terminer.pack(side="right", anchor="se", padx=paddings, pady=paddings)
+pied_de_page()
+
+# SUB SECTION 2-1 (Première colonne)
+
+frame2_1 = CTkFrame(master=frame2)
+frame2_1.pack(padx=paddings, pady=paddings, fill="both", side="left")
+
+frame2_1_A = CTkFrame(master=frame2_1)
+frame2_1_A.pack(fill="x", padx=paddings, pady=paddings)
+
+product_type_label = CTkLabel(master=frame2_1_A, text="TYPE DE PRODUIT",fg_color="transparent")
+product_type_label.pack(side="left", padx=paddings, pady=paddings)
+
+# Ajouter un type de produit "MODAL WINDOW"
+
+
+def ajouter_un_categorie():
+    ModalAjouterCategorie(master=root, frame=frame2_1_B, callback=afficher_categories)
+
+bouton_ajouter_categorie = CTkButton(master=frame2_1_A, text="Ajouter", command=ajouter_un_categorie, width=ctkbutton)
+bouton_ajouter_categorie.pack(side="right", padx=paddings, pady=paddings)
+
+# Supprimer un Catégorie
+def supp_categorie():
+    
+    for categorie in list(data.produit_par_categorie.keys()): 
+        if categorie == categorie_selectionne:
+            mysql_connexion_config.cursor.execute(
+                "DELETE FROM categories WHERE nom_categorie = %s",
+                (categorie_selectionne,)
+            )
+            mysql_connexion_config.connexion.commit()
+            del data.produit_par_categorie[categorie_selectionne]
+            
+            for widget in frame2_1_B.winfo_children():
+                widget.destroy()
+            for widget in frame2_2_C.winfo_children():
+                widget.destroy()
+            afficher_categories()
+            break
+
+bouton_supprimer_categorie = CTkButton(master=frame2_1_A, text="Supprimer", command=supp_categorie, width=ctkbutton)
+bouton_supprimer_categorie.pack(side="right", padx=paddings, pady=paddings)
+
+frame2_1_B = CTkScrollableFrame(master=frame2_1)
+frame2_1_B.pack(padx=paddings, pady=paddings, expand=True, fill="both", anchor="nw")
+
+# Sélection et affichage du type de produit
+def choisir_la_categorie_et_afficher_les_produit(categorie, frame_pour_affichage):
+    global categorie_selectionne
+    categorie_selectionne = categorie
+    for widget in frame_pour_affichage.winfo_children():
+        widget.destroy()
+    cursor = mysql_connexion_config.cursor
+    # Récupérer les produits de la catégorie depuis la base
+    cursor.execute("""
+    SELECT p.nom_produit, d.physico, d.micro, d.toxico, d.sous_total
+    FROM produits p
+    JOIN produit_details d ON p.id_produit = d.id_produit_detail
+    WHERE p.categorie_id = (
+        SELECT id_categorie FROM categories WHERE nom_categorie = %s
+    )
+""", (categorie_selectionne,))
+
+    produits = cursor.fetchall()
+                
+    if produits:
+        for produit_row in produits:
+            nom_produit, physico, micro, toxico, sous_total = produit_row
+            # Synchroniser est_valide avec data.etat_validation_produits
+            est_valide = bool(data.etat_validation_produits.get(nom_produit, False))
+            
+            rang = CTkFrame(
+                master=frame_pour_affichage
+            )
+            rang.pack(fill="x", padx=5, pady=5)
+            
+            etat_initial = {"border_width": rang.cget("border_width"), "fg_color": rang.cget("fg_color")}
+            
+            CTkLabel(master=rang, text=nom_produit, width=label_width, wraplength=label_width, fg_color="transparent").pack(side="left", anchor="w", padx=5, pady=5)
+
+            valeur_ref = data.valeur_ref_bull_analyse.get(nom_produit, 0)
+            
+            try:
+                Ref_bull_var = IntVar(value=int(valeur_ref))
+            except (ValueError, TypeError):
+                Ref_bull_var = IntVar(value=0)
+                print("ref. bulletin analyse error!")
+
+            def valider_entree(chiffre):
+                return chiffre.isdigit() or chiffre == ""
+
+            vcmd = (rang.register(valider_entree), '%P')   
+
+            Ref_bull_analyse = CTkEntry(master=rang, width=label_width, textvariable=Ref_bull_var, justify="right", state="disabled" if est_valide else "normal", validate="key", validatecommand=vcmd)
+            Ref_bull_analyse.pack(side="left", anchor="w", padx=5, pady=5)
+            
+
+            valeur_numActe = data.valeur_num_acte.get(nom_produit, "")
+            try:
+                Num_acte_var = StringVar(value=valeur_numActe)
+            except (ValueError, TypeError):
+                Num_acte_var = StringVar(value="")
+                print("ref. num acte error!")
+                
+            
+            Num_acte = CTkEntry(master=rang, width=label_width, textvariable=Num_acte_var, justify="right", state="disabled" if est_valide else "normal")
+            Num_acte.pack(side="left", anchor="w", padx=5, pady=5)
+            
+            def keyrelease_reference_b_analyse(var_ref, nom):
+                def handler(event):
+                    valeur1 = var_ref.get()
+                    
+                    if valeur1 != 0:
+                        data.valeur_ref_bull_analyse[nom] = valeur1
+                        
+                return handler
+
+            Ref_bull_analyse.bind("<KeyRelease>", keyrelease_reference_b_analyse(Ref_bull_var, nom_produit))
+            
+            def keyrelease_num_acte(var_acte, nom):
+                def handler(event):
+                    valeur = var_acte.get()
+                    
+                    if valeur != "":
+                        data.valeur_num_acte[nom] = valeur
+                        
+                return handler
+            
+            Num_acte.bind("<KeyRelease>", keyrelease_num_acte(Num_acte_var, nom_produit))
+
+            Physico_var = DoubleVar(value=physico)
+            physico_avec_separateur = StringVar(value=f"{int(Physico_var.get()):,}".replace(",", " "))
+            Physico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=physico_avec_separateur)
+            Physico.pack(side="left", anchor="w", padx=5, pady=5)
+
+            Micro_var = DoubleVar(value=micro)
+            Micro_avec_separateur = StringVar(value=f"{int(Micro_var.get()):,}".replace(",", " "))
+            Micro = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Micro_avec_separateur)
+            Micro.pack(side="left", anchor="w", padx=5, pady=5)
+
+            Toxico_var = DoubleVar(value=toxico)
+            Toxico_avec_separateur = StringVar(value=f"{int(Toxico_var.get()):,}".replace(",", " "))
+            Toxico = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Toxico_avec_separateur)
+            Toxico.pack(side="left", anchor="w", padx=5, pady=5)
+
+
+            Sous_total_var = DoubleVar(value=sous_total)
+            Sous_total_avec_separateur = StringVar(value=f"{int(Sous_total_var.get()):,}".replace(",", " "))
+            Sous_total = CTkEntry(master=rang, state="disabled", width=label_width, justify="right", textvariable=Sous_total_avec_separateur)
+            Sous_total.pack(side="left", anchor="w", padx=5, pady=5)
+
+            def only_float(P):
+                if P == "" or P.replace(".", "", 1).isdigit():
+                    return True
+                return False
+
+            vcmd = (rang.register(only_float), "%P")
+            Physico.configure(validate="key", validatecommand=vcmd)
+            Micro.configure(validate="key", validatecommand=vcmd)
+            Toxico.configure(validate="key", validatecommand=vcmd)
+
+            def modifier(nom_produit, Physico, Micro, Toxico, Sous_total, Physico_var, Micro_var, Toxico_var, Sous_total_var):
+                
+                Physico.configure(state="normal", textvariable=Physico_var)
+                
+                Physico.focus_set()
+                
+                def on_physico_return(event):
+                    
+                    physico_avec_separateur = StringVar(value=f"{int(Physico_var.get()):,}".replace(",", " "))
+                    
+                    Physico.configure(state="disabled",textvariable=physico_avec_separateur)
+                    
+                    Micro.configure(state="normal", textvariable=Micro_var)
+                    
+                    cursor.execute("""
+                        UPDATE produit_details d
+                        JOIN produits p ON d.id_produit_detail = p.id_produit
+                        SET d.physico = %s
+                        WHERE p.nom_produit = %s
+                        AND p.categorie_id = (
+                        SELECT id_categorie FROM categories WHERE nom_categorie = %s
+                    )""",
+                    (Physico_var.get(), nom_produit, categorie_selectionne))
+
+                    mysql_connexion_config.connexion.commit()
+                    Micro.focus_set()
+                Physico.bind("<Return>", on_physico_return)
+                
+                def on_micro_return(event):
+                    
+                    Micro_avec_separateur = StringVar(value=f"{int(Micro_var.get()):,}".replace(",", " "))
+                    
+                    Micro.configure(state="disabled", textvariable=Micro_avec_separateur)
+                    
+                    Toxico.configure(state="normal", textvariable=Toxico_var)
+                    
+                    cursor.execute("""
+                        UPDATE produit_details d
+                        JOIN produits p ON d.id_produit_detail = p.id_produit
+                        SET d.micro = %s
+                        WHERE p.nom_produit = %s
+                        AND p.categorie_id = (
+                        SELECT id_categorie FROM categories WHERE nom_categorie = %s
+                    )""",
+                    (Micro_var.get(), nom_produit, categorie_selectionne))
+                    mysql_connexion_config.connexion.commit()
+                    Toxico.focus_set()
+                Micro.bind("<Return>", on_micro_return)
+                
+                def on_toxico_return(event):
+                    try:
+                        cursor.execute("""
+                            UPDATE produit_details d
+                            JOIN produits p ON d.id_produit_detail = p.id_produit
+                            SET d.toxico = %s
+                            WHERE p.nom_produit = %s
+                            AND p.categorie_id = (
+                            SELECT id_categorie FROM categories WHERE nom_categorie = %s
+                        )""",
+                        (Toxico_var.get(), nom_produit, categorie_selectionne))
+                        
+                        physico_val = float(Physico_var.get())
+                        micro_val = float(Micro_var.get())
+                        toxico_val = float(Toxico_var.get())
+                        sous_total_val = physico_val + micro_val + toxico_val
+                        Sous_total_var.set(sous_total_val)
+                        cursor.execute("""
+                            UPDATE produit_details d
+                            JOIN produits p ON d.produit_id = p.id_produit
+                            SET d.sous_total = %s
+                            WHERE p.nom_produit = %s
+                            AND p.categorie_id = (
+                            SELECT id_categorie FROM categories WHERE nom_categorie = %s
+                        )""",
+                        (sous_total_val, nom_produit, categorie_selectionne))
                         mysql_connexion_config.connexion.commit()
                         
-                        for widget in frame_pour_affichage.winfo_children():
-                            widget.destroy()
-                        choisir_la_categorie_et_afficher_les_produit(categorie_selectionne, frame_pour_affichage)
+                        Sous_total_avec_separateur = StringVar(value=f"{int(Sous_total_var.get()):,}".replace(",", " "))
+                        
+                        Sous_total.configure(state="disabled", textvariable=Sous_total_avec_separateur)
+                        Physico.configure(state="disabled")
+                        Micro.configure(state="disabled")
+                        
+                        Toxico_avec_separateur = StringVar(value=f"{int(Toxico_var.get()):,}".replace(",", " "))
+                        
+                        Toxico.configure(state="disabled", textvariable=Toxico_avec_separateur)
+                    except ValueError:
+                        print("Veuillez entrer un nombre valide.")
+                Toxico.bind("<Return>", on_toxico_return)
 
-                    bouton_suppr = CTkButton(master=rang, text="suppr", width=ctkbutton, command=supprimer_produit)
-                    bouton_suppr.pack(side="left", anchor="w", padx=5, pady=5)
+            # Synchronisation du bouton valider/annuler avec est_valide
+            def valider_produit(prod, rang, btn_m, btn_s, n_a, rba, valider_btn):
+                est_valide = bool(data.etat_validation_produits.get(prod, False))
+                if not est_valide:
+                    rang.configure(border_width=1, fg_color=['skyblue','gray17'] )
+                    btn_m.configure(state="disabled") 
+                    btn_s.configure(state="disabled")
+                    n_a.configure(state="disabled")
+                    rba.configure(state="disabled")
+        
+                    data.etat_validation_produits[prod] = True
+                    valider_btn.configure(text="annuler")
+                
+                else:
+                    rang.configure(border_width=etat_initial["border_width"], fg_color=etat_initial["fg_color"])
+                    btn_m.configure(state="normal") 
+                    btn_s.configure(state="normal")
+                    n_a.configure(state="normal")
+                    rba.configure(state="normal")
+                    del data.etat_validation_produits[prod]
+                    valider_btn.configure(text="valider")
                     
-                    valider_bouton = CTkButton(
-                        master=rang,
-                        text="annuler" if est_valide else "valider",
-                        width=ctkbutton,
-                        command=lambda prod=nom_produit, r=rang, btn_m=bouton_modifier, btn_s=bouton_suppr, rba=Ref_bull_analyse, n_a=Num_acte: valider_produit(prod, r, btn_m, btn_s, n_a, rba)
-                    )
-                    # On doit passer le bouton lui-même à la fonction pour pouvoir changer son texte
-                    valider_bouton.configure(command=lambda prod=nom_produit, r=rang, btn_m=bouton_modifier, btn_s=bouton_suppr, rba=Ref_bull_analyse, n_a=Num_acte, valider_btn=valider_bouton: valider_produit(prod, r, btn_m, btn_s, n_a, rba, valider_btn))
-                    valider_bouton.pack(side="left", anchor="w", padx=5, pady=5)
-            else:
-                CTkLabel(master=frame_pour_affichage, text=f"Type de produit: {categorie_selectionne}", fg_color="transparent").pack(side="left", fill="both", expand=True)
 
-        def afficher_categories():
-            if data.produit_par_categorie:
-                for categorie in list(data.produit_par_categorie.keys()):
-                    CTkButton(master=frame2_1_B, text=categorie, width=ctkbutton, command=lambda categorie=categorie: choisir_la_categorie_et_afficher_les_produit(categorie, frame2_2_C)).pack(fill="x", padx=paddings, pady=paddings)
-            else:
-                CTkLabel(master=frame2_1_B, text="Aucun type de produit", fg_color="transparent").pack(fill="x", padx=paddings, pady=paddings)
+            bouton_modifier = CTkButton(
+                master=rang,
+                text="Modifier",
+                width=ctkbutton,
+                
+                command=lambda prod=nom_produit, p=Physico, m=Micro, t=Toxico, s=Sous_total, pv=Physico_var, mv=Micro_var, tv=Toxico_var, sv=Sous_total_var: modifier(prod, p, m, t, s, pv, mv, tv, sv)
+            )
+            bouton_modifier.pack(side="left", anchor="w", padx=5, pady=5)
 
-        afficher_categories()
+            def supprimer_produit():
+                cursor.execute(
+                    "DELETE FROM produits WHERE nom_produit = %s AND categorie_id = (SELECT id_categorie FROM categories WHERE nom_categorie = %s)",
+                    (nom_produit, categorie_selectionne)
+                )
+                mysql_connexion_config.connexion.commit()
+                
+                for widget in frame_pour_affichage.winfo_children():
+                    widget.destroy()
+                choisir_la_categorie_et_afficher_les_produit(categorie_selectionne, frame_pour_affichage)
 
-        # SUB SECTION 2-2 (Deuxième colonne)
-
-        frame2_2 = CTkFrame(master=frame2)
-        frame2_2.pack(padx=paddings, pady=paddings, expand=True, fill="both", side="right")
-
-        frame2_2_A = CTkFrame(master=frame2_2)
-        frame2_2_A.pack(padx=paddings, pady=paddings, fill="both")
-
-        def ajouter_produit():
-            if categorie_selectionne:
-                ModalAjouterProduit(root, categorie_selectionne, callback=lambda: choisir_la_categorie_et_afficher_les_produit(categorie_selectionne, frame2_2_C))
-            return
-
-        ajouter_produit_button = CTkButton(master=frame2_2_A, text="Ajouter produit", width=ctkbutton, command=ajouter_produit)
-        ajouter_produit_button.pack(side="right", padx=paddings, pady=paddings)
-
-        def etiquette():
-            frame2_2_B = CTkFrame(master=frame2_2)
-            frame2_2_B.pack(fill="x", padx=paddings, pady=paddings)
-
-            product_name_label = CTkLabel(master=frame2_2_B, text="Désignation", width=label_width, fg_color="transparent", wraplength=label_width)
-            product_name_label.grid(column=0, row=0, padx=paddings, pady=paddings)
+            bouton_suppr = CTkButton(master=rang, text="suppr", width=ctkbutton, command=supprimer_produit)
+            bouton_suppr.pack(side="left", anchor="w", padx=5, pady=5)
             
-            ref_bulletin_analyse = CTkLabel(master=frame2_2_B, text="Ref. B. analyse", width=label_width, fg_color="transparent", wraplength=label_width)
-            ref_bulletin_analyse.grid(column=1, row=0, padx=paddings, pady=paddings)
+            valider_bouton = CTkButton(
+                master=rang,
+                text="annuler" if est_valide else "valider",
+                width=ctkbutton,
+                command=lambda prod=nom_produit, r=rang, btn_m=bouton_modifier, btn_s=bouton_suppr, rba=Ref_bull_analyse, n_a=Num_acte: valider_produit(prod, r, btn_m, btn_s, n_a, rba)
+            )
+            # On doit passer le bouton lui-même à la fonction pour pouvoir changer son texte
+            valider_bouton.configure(command=lambda prod=nom_produit, r=rang, btn_m=bouton_modifier, btn_s=bouton_suppr, rba=Ref_bull_analyse, n_a=Num_acte, valider_btn=valider_bouton: valider_produit(prod, r, btn_m, btn_s, n_a, rba, valider_btn))
+            valider_bouton.pack(side="left", anchor="w", padx=5, pady=5)
+    else:
+        CTkLabel(master=frame_pour_affichage, text=f"Type de produit: {categorie_selectionne}", fg_color="transparent").pack(side="left", fill="both", expand=True)
 
-            act_label = CTkLabel(master=frame2_2_B, text="N°Acte", width=label_width, fg_color="transparent", wraplength=label_width)
-            act_label.grid(column=2, row=0, padx=paddings, pady=paddings)
+def afficher_categories():
+    if data.produit_par_categorie:
+        for categorie in list(data.produit_par_categorie.keys()):
+            CTkButton(master=frame2_1_B, text=categorie, width=ctkbutton, command=lambda categorie=categorie: choisir_la_categorie_et_afficher_les_produit(categorie, frame2_2_C)).pack(fill="x", padx=paddings, pady=paddings)
+    else:
+        CTkLabel(master=frame2_1_B, text="Aucun type de produit", fg_color="transparent").pack(fill="x", padx=paddings, pady=paddings)
 
-            physico_chimique_label = CTkLabel(master=frame2_2_B, text="Physico", width=label_width, fg_color="transparent", wraplength=label_width)
-            physico_chimique_label.grid(column=3, row=0, padx=paddings, pady=paddings)
+afficher_categories()
 
-            micro_biologic_label = CTkLabel(master=frame2_2_B, text="Micro", width=label_width, fg_color="transparent", wraplength=label_width)
-            micro_biologic_label.grid(column=4, row=0, padx=paddings, pady=paddings)
+# SUB SECTION 2-2 (Deuxième colonne)
 
-            toxicologic_label = CTkLabel(master=frame2_2_B, text="Toxico", width=label_width, fg_color="transparent", wraplength=label_width)
-            toxicologic_label.grid(column=5, row=0, padx=paddings, pady=paddings)
+frame2_2 = CTkFrame(master=frame2)
+frame2_2.pack(padx=paddings, pady=paddings, expand=True, fill="both", side="right")
 
-            sous_total_label = CTkLabel(master=frame2_2_B, text="Sous total", width=label_width, fg_color="transparent", wraplength=label_width)
-            sous_total_label.grid(column=6, row=0, padx=paddings, pady=paddings)
+frame2_2_A = CTkFrame(master=frame2_2)
+frame2_2_A.pack(padx=paddings, pady=paddings, fill="both")
 
-        etiquette()
+def ajouter_produit():
+    if categorie_selectionne:
+        ModalAjouterProduit(root, categorie_selectionne, callback=lambda: choisir_la_categorie_et_afficher_les_produit(categorie_selectionne, frame2_2_C))
+    return
 
-        frame2_2_C = CTkScrollableFrame(master=frame2_2)
-        frame2_2_C.pack(fill="both", expand=True, padx=paddings, pady=paddings)
-                    
-def btn_suivant():
-    bouton_suivant = CTkButton(master=frame1, command=suivant,text="Suivant", width=ctkbutton, state="disabled" if _suivant else "normal")
-    bouton_suivant.grid(column=3, row=4, padx=paddings, pady=paddings)
-    return bouton_suivant
-btn_suivant()
-bouton_suivant = btn_suivant()
+ajouter_produit_button = CTkButton(master=frame2_2_A, text="Ajouter produit", width=ctkbutton, command=ajouter_produit)
+ajouter_produit_button.pack(side="right", padx=paddings, pady=paddings)
 
-# CORP (body)
-if not terminer :
-    frame2 = CTkFrame(master=mframe)
-    frame2.pack_forget()
+def etiquette():
+    frame2_2_B = CTkFrame(master=frame2_2)
+    frame2_2_B.pack(fill="x", padx=paddings, pady=paddings)
 
+    product_name_label = CTkLabel(master=frame2_2_B, text="Désignation", width=label_width, fg_color="transparent", wraplength=label_width)
+    product_name_label.grid(column=0, row=0, padx=paddings, pady=paddings)
+    
+    ref_bulletin_analyse = CTkLabel(master=frame2_2_B, text="Ref. B. analyse", width=label_width, fg_color="transparent", wraplength=label_width)
+    ref_bulletin_analyse.grid(column=1, row=0, padx=paddings, pady=paddings)
+
+    act_label = CTkLabel(master=frame2_2_B, text="N°Acte", width=label_width, fg_color="transparent", wraplength=label_width)
+    act_label.grid(column=2, row=0, padx=paddings, pady=paddings)
+
+    physico_chimique_label = CTkLabel(master=frame2_2_B, text="Physico", width=label_width, fg_color="transparent", wraplength=label_width)
+    physico_chimique_label.grid(column=3, row=0, padx=paddings, pady=paddings)
+
+    micro_biologic_label = CTkLabel(master=frame2_2_B, text="Micro", width=label_width, fg_color="transparent", wraplength=label_width)
+    micro_biologic_label.grid(column=4, row=0, padx=paddings, pady=paddings)
+
+    toxicologic_label = CTkLabel(master=frame2_2_B, text="Toxico", width=label_width, fg_color="transparent", wraplength=label_width)
+    toxicologic_label.grid(column=5, row=0, padx=paddings, pady=paddings)
+
+    sous_total_label = CTkLabel(master=frame2_2_B, text="Sous total", width=label_width, fg_color="transparent", wraplength=label_width)
+    sous_total_label.grid(column=6, row=0, padx=paddings, pady=paddings)
+
+etiquette()
+
+frame2_2_C = CTkScrollableFrame(master=frame2_2)
+frame2_2_C.pack(fill="both", expand=True, padx=paddings, pady=paddings)
+                
 
 root.mainloop()
