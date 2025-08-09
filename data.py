@@ -1,4 +1,5 @@
 id = 1
+facture_proforma = False
 produit_par_categorie = {}
 produit_valider = []
 etat_validation_produits = {}  # clé: nom_produit, valeur: True/False
