@@ -1,5 +1,5 @@
 from customtkinter import CTk, CTkFrame, CTkEntry, CTkButton, CTkScrollableFrame, CTkLabel, DoubleVar, CTkFont
-from customtkinter import StringVar, IntVar, CTkToplevel
+from customtkinter import StringVar, IntVar, CTkToplevel, CTkRadioButton
 import customtkinter
 from CTkMessagebox import CTkMessagebox
 import mysql
@@ -63,7 +63,8 @@ def relance_fantôme():
     
 dropdown = CustomDropdownMenu(widget=menu_fichier)
 
-dropdown.add_option(option="Nouveau", command=relance_fantôme)
+dropdown.add_option(option="Nouveau", command=relance_fantôme) 
+
 
 def rechercher_facture():
     ModalRechercherModifierFacture(parent=root)
@@ -124,11 +125,6 @@ for row in mysql_connexion_config.cursor.fetchall():
 paddings = 5
 ctkbutton = 10
 
-# Récupérer le dernier id inséré dans info_client
-mysql_connexion_config.cursor.execute("SELECT MAX(id_client) FROM info_client")
-result = mysql_connexion_config.cursor.fetchone()
-id = result[0] + 1 if result and result[0] is not None else 1
-data.id = id
 
 label_width = 75
 my_font = CTkFont(family="Comfortaa", size=12, weight="bold", slant="italic")
@@ -141,68 +137,140 @@ categorie_selectionne = None
 frame1 = CTkFrame(master=mframe, border_color="gray", border_width=1)
 frame1.pack(padx=paddings, pady=paddings, side="top", anchor="nw")
 
+
+def type_de_facture():
+    option = selected_option.get()  # Récupère la valeur sélectionnée
+    if option == "Option 2":
+        data.facture_proforma = True
+        num_fact()
+        
+    elif option == "Option 1":
+        data.facture_proforma = False
+        num_fact()
+        
+    else:
+        print("Option sélectionnée inconnue :", option)
+
+selected_option = StringVar(value="Option 1")  # valeur par défaut
+
+# Créer les boutons radio
+radio1 = CTkRadioButton(
+    frame1,
+    text="Facture",
+    variable=selected_option,
+    value="Option 1",
+    width=20,
+    height=20,
+    border_width_checked=5,
+    border_width_unchecked=2,
+    radiobutton_height=16,
+    radiobutton_width=16,
+    font=my_font,
+    text_color="black",
+    fg_color="skyblue",
+    command=type_de_facture
+)
+
+radio2 = CTkRadioButton(
+    frame1,
+    text="Facture PROFORMA",
+    variable=selected_option,
+    value="Option 2",
+    width=20,
+    height=20,
+    border_width_checked=5,
+    border_width_unchecked=2,
+    radiobutton_height=16,
+    radiobutton_width=16,
+    font=my_font,
+    text_color="black",
+    fg_color="skyblue",
+    command=type_de_facture
+)
+
+# Placer les boutons
+radio1.grid(row=0, column=0, sticky="w", padx=10, pady=5)
+radio2.grid(row=0, column=1, sticky="w", padx=10, pady=5)
+
+
+
 # Raison social
 raison_social_label = CTkLabel(master=frame1, text="* Raison social: ", font=my_font, fg_color="transparent", anchor="w")
-raison_social_label.grid(column=0, row=0, padx=paddings, pady=paddings, sticky="w")
+raison_social_label.grid(column=0, row=1, padx=paddings, pady=paddings, sticky="w")
 
 raison_social_input = CTkEntry(master=frame1, textvariable=StringVar())
-raison_social_input.grid(column=1, row=0, padx=paddings, pady=paddings)
+raison_social_input.grid(column=1, row=1, padx=paddings, pady=paddings)
 
 # Statistique
 statistique_label = CTkLabel(master=frame1, text="Statistique: ", font=my_font, fg_color="transparent", anchor="w")
-statistique_label.grid(column=0, row=1, padx=paddings, pady=paddings, sticky="w")
+statistique_label.grid(column=0, row=2, padx=paddings, pady=paddings, sticky="w")
 
 statistique_input = CTkEntry(master=frame1, textvariable=StringVar())
-statistique_input.grid(column=1, row=1, padx=paddings, pady=paddings)
+statistique_input.grid(column=1, row=2, padx=paddings, pady=paddings)
 
 # NIF
 nif_label = CTkLabel(master=frame1, text="NIF: ", font=my_font, fg_color="transparent", anchor="w")
-nif_label.grid(column=0, row=2, padx=paddings, pady=paddings, sticky="w")
+nif_label.grid(column=0, row=3, padx=paddings, pady=paddings, sticky="w")
 
 nif_input = CTkEntry(master=frame1, textvariable=StringVar())
-nif_input.grid(column=1, row=2, padx=paddings, pady=paddings)
+nif_input.grid(column=1, row=3, padx=paddings, pady=paddings)
 
 # Adresse
 adresse_label = CTkLabel(master=frame1, text="Adresse: ", font=my_font, fg_color="transparent", anchor="w")
-adresse_label.grid(column=0, row=3, padx=paddings, pady=paddings, sticky="w")
+adresse_label.grid(column=0, row=4, padx=paddings, pady=paddings, sticky="w")
 
 adresse_input = CTkEntry(master=frame1, textvariable=StringVar())
-adresse_input.grid(column=1, row=3, padx=paddings, pady=paddings)
+adresse_input.grid(column=1, row=4, padx=paddings, pady=paddings)
 
 # N°Facture
+facture_label = CTkLabel(master=frame1, text="", font=my_font, fg_color="transparent", anchor="w")
+facture_label.grid(column=0, row=4, padx=paddings, pady=paddings, sticky="w")
+
 def num_fact():    
-    facture_label = CTkLabel(master=frame1, text=f"Facture N°{data.id}", font=my_font, fg_color="transparent", anchor="w")
-    facture_label.grid(column=0, row=4, padx=paddings, pady=paddings, sticky="w")
+    if data.facture_proforma:
+        # Récupérer le dernier id inséré dans info_client
+        mysql_connexion_config.cursor.execute("SELECT MAX(id_proforma) FROM facture_proforma")
+        result = mysql_connexion_config.cursor.fetchone()
+        id = result[0] + 1 if result and result[0] is not None else 1
+        data.id = id
+        facture_label.configure(text=f"Facture PROFORMA N°{data.id}")
+    else:
+        # Récupérer le dernier id inséré dans info_client
+        mysql_connexion_config.cursor.execute("SELECT MAX(id_client) FROM info_client")
+        result = mysql_connexion_config.cursor.fetchone()
+        id = result[0] + 1 if result and result[0] is not None else 1
+        data.id = id
+        facture_label.configure(text=f"Facture N°{data.id}")
 num_fact()
 
 # date d'émission
 
 date_emission_label = CTkLabel(master=frame1, text="* Date d'émission: ", font=my_font, fg_color="transparent", anchor="w")
-date_emission_label.grid(column=2, row=0, padx=paddings, pady=paddings, sticky="w")
+date_emission_label.grid(column=2, row=1, padx=paddings, pady=paddings, sticky="w")
 
 date_emission_input = DateEntry(master=frame1, selectmode='day', date_pattern='yyyy-mm-dd', bd=adresse_input.cget("border_width"), width=15)
-date_emission_input.grid(column=3, row=0, padx=paddings, pady=paddings)
+date_emission_input.grid(column=3, row=1, padx=paddings, pady=paddings)
 
 # Date du résultat
 date_du_resultat_label = CTkLabel(master=frame1, text="* Date du résultat: ", font=my_font, fg_color="transparent", anchor="w")
-date_du_resultat_label.grid(column=2, row=1, padx=paddings, pady=paddings, sticky="w")
+date_du_resultat_label.grid(column=2, row=2, padx=paddings, pady=paddings, sticky="w")
 
 date_du_resultat_input = DateEntry(master=frame1, selectmode='day', date_pattern='yyyy-mm-dd', width=15)
-date_du_resultat_input.grid(column=3, row=1, padx=paddings, pady=paddings)
+date_du_resultat_input.grid(column=3, row=2, padx=paddings, pady=paddings)
 
 # Référence des produits (en int)
 reference_des_produits_label = CTkLabel(master=frame1, text="Référence des produits: ", font=my_font, fg_color="transparent", anchor="w")
-reference_des_produits_label.grid(column=2, row=2, padx=paddings, pady=paddings, sticky="w")
+reference_des_produits_label.grid(column=2, row=3, padx=paddings, pady=paddings, sticky="w")
 
 reference_des_produits_input = CTkEntry(master=frame1, textvariable=StringVar())
-reference_des_produits_input.grid(column=3, row=2, padx=paddings, pady=paddings)
+reference_des_produits_input.grid(column=3, row=3, padx=paddings, pady=paddings)
 
 # Résponsable
 responsable_label = CTkLabel(master=frame1, text="* Responsable: ", font=my_font, fg_color="transparent", anchor="w")
-responsable_label.grid(column=2, row=3, padx=paddings, pady=paddings, sticky="w")
+responsable_label.grid(column=2, row=4, padx=paddings, pady=paddings, sticky="w")
 
 responsable_input = CTkEntry(master=frame1, textvariable=StringVar())
-responsable_input.grid(column=3, row=3, padx=paddings, pady=paddings)
+responsable_input.grid(column=3, row=4, padx=paddings, pady=paddings)
 
 
 

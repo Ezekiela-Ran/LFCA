@@ -75,3 +75,10 @@ cursor.execute("""
     total INT NOT NULL,
     FOREIGN KEY (client_id) REFERENCES info_client(id_client) ON DELETE CASCADE
 )""")
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS facture_proforma (
+    
+    id_proforma INT AUTO_INCREMENT PRIMARY KEY
+    
+)""")
