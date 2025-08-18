@@ -1,8 +1,11 @@
 from openpyxl import Workbook
 from openpyxl.styles import Border, Side, Alignment, Font
 from openpyxl.drawing.image import Image
+from num2words import num2words
 
-def saisir_facture(raison_social, produit_analyses):
+def saisir_facture(num_fact ,raison_social, stat, nif, adresse, date_e, date_r, ref_produits, responsable, produit_analyses, net_a_payer):
+
+    montant_en_lettre = num2words(int(net_a_payer), lang='fr')
 
     wb = Workbook()
     ws = wb.active
@@ -44,11 +47,11 @@ def saisir_facture(raison_social, produit_analyses):
         ('A9', "TEL:", acssqda_info_font, None, None),
         ('A10', "Adresse:", acssqda_info_font, None, None),
         ('A13', "Numéro", normal_font, Border(top=Side(style='thin'), left=Side(style='thin')), None),
-        ('A14', "", normal_font, border_left, None),
+        ('A14', num_fact, normal_font, border_left, align_center),
         ('A15', "Réf.", normal_font, Border(top=Side(style='thin'), right=Side(style='thin'), left=Side(style='thin')), None),
         ('A16', "Bulletin", normal_font, Border(right=Side(style='thin'), left=Side(style='thin')), None),
         ('A17', "d'analyse", normal_font, Border(bottom=Side(style='thin'), right=Side(style='thin'), left=Side(style='thin')), None),
-        ('A44', "Arrêtée la présente facture à la somme de : Ariary ", normal_font, None, None),
+        ('A44', f"Arrêtée la présente facture à la somme de : {montant_en_lettre.upper()} Ariary ", normal_font, None, None),
         ('A46', "Mode de paiement", normal_font, None, None),
         ('A50', "(*) Chèque vise à l'ordre de Madame le RECEVEUR GENERAL .", normal_font, None, None),
         # Colonne B
@@ -62,6 +65,7 @@ def saisir_facture(raison_social, produit_analyses):
         ('B10', "Rue Karidja Tsaralalàna", acssqda_info_font, None, None),
         ('B11', "(Ex Bâtiment Pharmacie Centrale Face Hôtel de Police)", acssqda_info_font, None, None),
         ('B13', "Date d'émission", normal_font, border_top, None),
+        ('B14', date_e, normal_font, None, align_center),
         ('B15', "", None, Border(top=Side(style='thin'), right=Side(style='thin')), None),
         ('B16', "Désignations", normal_font, border_right, None),
         ('B17', "", None, Border(bottom=Side(style='thin'), right=Side(style='thin')), None),
@@ -69,6 +73,7 @@ def saisir_facture(raison_social, produit_analyses):
         # Colonne C
         ('C12', "FACTURE", Font(name='Calibri', size=12, bold=True, italic=True), None, None),
         ('C13', "Référence(s) des produits", normal_font, border_top, None),
+        ('C14', ref_produits, normal_font, None, None),
         ('C15', "", None, Border(top=Side('thin'), right=Side('thin')), None),
         ('C16', "N°Acte de", normal_font, border_right, None),
         ('C17', "prélèvement", normal_font, Border(bottom=Side('thin'), right=Side('thin')), None),
@@ -89,8 +94,11 @@ def saisir_facture(raison_social, produit_analyses):
         # Colonne E
         ('E1', "DOIT", titre_font, border_bottom, None),
         ('E2', raison_social, normal_font, None, None),
-        ('E8', "", None, border_bottom, None),
+        ('E4', stat, normal_font, None, None),
+        ('E6', nif, normal_font, None, None),
+        ('E8', adresse, None, border_bottom, None),
         ('E13', "Date du résultat", normal_font, border_top, None),
+        ('E14', date_r, normal_font, None, align_center),
         ('E15', "", None, Border(top=Side('thin'), right=Side('thin')), None),
         ('E16', "Micro-", normal_font, border_right, None),
         ('E17', "biologique", normal_font, Border(bottom=Side('thin'), right=Side('thin')), None),
@@ -99,6 +107,7 @@ def saisir_facture(raison_social, produit_analyses):
         ('F1', "", None, border_bottom, None),
         ('F8', "", None, border_bottom, None),
         ('F13', "Responsable", normal_font, border_top, align_center),
+        ('F14', responsable, normal_font, None, None),
         ('F15', "", None, Border(top=Side('thin'), right=Side('thin')), None),
         ('F16', "Toxico-", normal_font, border_right, None),
         ('F17', "logique", normal_font, Border(right=Side('thin'), bottom=Side('thin')), None),
@@ -117,7 +126,7 @@ def saisir_facture(raison_social, produit_analyses):
         ('G15', "", None, Border(top=Side('thin'), right=Side('thin')), None),
         ('G16', "Sous-total", normal_font, border_right, None),
         ('G17', "", None, Border(bottom=Side('thin'), right=Side('thin')), None),
-        ('G42', "Ar", normal_font, None, Alignment(horizontal='right')),
+        ('G42', f"{net_a_payer} Ar", normal_font, None, Alignment(horizontal='right')),
     ]
 
     # Set cell values, fonts, borders, alignments
